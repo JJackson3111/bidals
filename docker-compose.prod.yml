@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bidals}
+      POSTGRES_USER: ${POSTGRES_USER:-bidals}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bidals} -d ${POSTGRES_DB:-bidals}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_SETTINGS_MODULE: bidals.settings.prod
+      DATABASE_URL: ${DATABASE_URL:-postgres://bidals:change-me@db:5432/bidals}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      USE_REDIS_CACHE: ${USE_REDIS_CACHE:-True}
+      PORT: ${BACKEND_CONTAINER_PORT:-8000}
+    ports:
+      - "${BACKEND_PORT:-8000}:${BACKEND_CONTAINER_PORT:-8000}"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${BACKEND_CONTAINER_PORT:-8000}/api/health/ >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api}
+    environment:
+      PORT: ${FRONTEND_CONTAINER_PORT:-3000}
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
