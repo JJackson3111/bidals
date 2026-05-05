@@ -229,6 +229,17 @@ Staging credentials:
 
 The staging seed creates obvious fake records labelled `[STAGING TEST AUCTION]` and `[DEMO LOT]`. It refuses to run when `BIDALS_ENV=production` unless `--force` is supplied; do not use `--force` against production data.
 
+Create or repair a staging admin account without seeding demo data:
+
+```bash
+STAGING_ADMIN_PASSWORD='<strong-temporary-password>' \
+python manage.py create_staging_admin \
+  --username staging_admin \
+  --email admin@bidals.staging.test
+```
+
+Run that command in the Render backend shell with `BIDALS_ENV=staging`. The command refuses to run outside staging unless `--force` is supplied, reads the password only from the named environment variable, does not print the password, and creates an audit log. Do not set `STAGING_ADMIN_PASSWORD` on production services.
+
 Run backend tests:
 
 ```bash
@@ -1450,6 +1461,7 @@ If auction closing or winner calculation fails:
 
 - Use `python manage.py seed_demo` only in local or throwaway demo environments.
 - Use `python manage.py seed_staging_data` only in staging or explicit non-production environments.
+- Use `python manage.py create_staging_admin` in staging when you need an admin account without loading all staging seed data; set `STAGING_ADMIN_PASSWORD` only for that shell/session.
 - Keep `BIDALS_ENV=production` on production services so staging seed data cannot be loaded accidentally.
 - Review bid logs for repeated `RATE_LIMITED`, `USER_NOT_ALLOWED`, and `UNAUTHENTICATED` events.
 - Tune `BID_RATE_LIMIT_AUTHENTICATED_ATTEMPTS` carefully for high-velocity live auctions.

@@ -2,7 +2,7 @@
 
 Provider selected: Render
 
-Status: PARTIAL - backend and frontend staging services are deployed, health/browse/auth/create/bidding flows have live evidence, the Browse empty-state issue is fixed, and the bid endpoint `500` regression is fixed and verified after backend redeploy commit `cb9ca78`. Remaining Phase 17 work is focused on admin credentials, scheduler proof, backup/restore evidence, and `release_check`.
+Status: PARTIAL - staging core is healthy. Backend and frontend staging services are deployed, health/browse/auth/create/bidding flows have live evidence, the Browse empty-state issue is fixed, the bid endpoint `500` regression is fixed and verified after backend redeploy commit `cb9ca78`, and Render shell readiness checks now pass their core health/migration/audit checks. Production readiness still requires Redis, scheduler jobs, object/media storage, backup restore evidence, and final admin workflow checks.
 
 This document is the Phase 17 execution record. Fill in the evidence sections during the live Render staging rehearsal. Do not record secrets, tokens, database passwords, or private keys here.
 
@@ -73,6 +73,8 @@ Confirmed staging evidence so far:
 | Frontend browse route | PASS | `GET https://bidals-1.onrender.com/auctions` returns `200 OK`; operator confirmed Browse now shows empty states for no auctions/lots. |
 | Frontend browse empty state | PASS | Browse page no longer treats a valid empty DRF paginated response as an error. |
 | Bid endpoint after `cb9ca78` redeploy | PASS | Fresh smoke lot id `4`: valid bid `15.00` returned `201 accepted`, invalid bid `16.00` returned `409 INVALID_INCREMENT`, anonymous bid `20.00` returned `401 UNAUTHENTICATED`, and `current_price` moved only from `10.00` to `15.00`. |
+| Render `release_check` | PASS/WARN | Render shell check now passes health endpoint, migrations, audit logs, and admin export installation/protection. Remaining WARN items are backup, scheduled jobs, fulfillment, repair workflow, and notification unread count. |
+| Render `deployment_check --production` | PASS/WARN | Render shell check now passes DEBUG, SECRET_KEY, ALLOWED_HOSTS, DATABASE, EMAIL disabled safely, MIGRATIONS, and HEALTH. Remaining WARN items are Redis disabled and local media storage. |
 
 ## Staging Environment Variables
 
@@ -109,6 +111,7 @@ Backend:
 - `BACKUP_PROVIDER=render`
 - `BACKUP_LAST_VERIFIED_AT=<ISO-8601 timestamp after backup is verified>`
 - `BACKUP_LAST_RESTORE_TEST_AT=<ISO-8601 timestamp after restore test passes>`
+- `STAGING_ADMIN_PASSWORD=<set only in a one-off Render shell/session when running create_staging_admin>`
 
 Frontend:
 
@@ -131,6 +134,37 @@ Evidence to capture:
 - Last run timestamp:
 - Log excerpt showing success:
 - Audit log event visible in `/dashboard/operations`:
+
+## Safe Staging Admin Setup
+
+Use this path when staging needs an admin account but you do not want to load the full staging data seed.
+
+Safety properties:
+
+- Refuses to run unless `BIDALS_ENV=staging`.
+- Can run outside staging only with explicit `--force`; do not use `--force` against production data.
+- Reads the password from an environment variable only.
+- Does not print the password.
+- Creates or updates a role `admin`, staff, superuser account.
+- Writes an `admin_action` audit log with non-secret metadata.
+
+Render backend shell command:
+
+```bash
+export STAGING_ADMIN_PASSWORD='<strong-temporary-password>'
+python manage.py create_staging_admin \
+  --username staging_admin \
+  --email admin@bidals.staging.test
+unset STAGING_ADMIN_PASSWORD
+```
+
+Alternative full staging seed command:
+
+```bash
+python manage.py seed_staging_data
+```
+
+The full seed command also refuses production unless `--force`, but it creates demo auctions, lots, bids, fulfillment records, and notifications in addition to the staging users.
 
 ## Backup Restore Verification
 
@@ -174,6 +208,7 @@ Restore evidence:
 
 ```bash
 python manage.py migrate
+STAGING_ADMIN_PASSWORD='<strong-temporary-password>' python manage.py create_staging_admin --username staging_admin --email admin@bidals.staging.test
 python manage.py seed_staging_data
 python manage.py deployment_check --production
 python manage.py verify_backup
@@ -201,23 +236,26 @@ npm run test:e2e:ci
 Paste sanitized staging output here:
 
 ```text
-RENDER SHELL RESULT BEFORE HEALTH-PATH FIX
+RENDER SHELL RESULT AFTER HEALTH-PATH FIX
 
 Command:
 python manage.py release_check
 
 Result:
-FAIL - the only reported failure was the health endpoint check returning 301 because the command checked /api/health instead of /api/health/.
+PASS/WARN - no health endpoint failure remains.
 
-Relevant sanitized output:
-[FAIL] system / Health endpoint: Health endpoint returned status 301.
+Confirmed PASS checks:
+[PASS] system / Health endpoint
+[PASS] database / Migrations
+[PASS] ops / Audit logs
+[PASS] ops / Admin export
 
-Fix applied in code:
-release_check now checks /api/health/ and follows redirects safely. Local verification after the fix shows:
-[PASS] system / Health endpoint: Backend health endpoint /api/health/ responds with a request id.
-
-Expected after redeploy:
-No release_check failure from the health endpoint. Remaining WARN items are operational/manual readiness items listed below.
+Remaining WARN checks:
+[WARN] database / Backup verification
+[WARN] ops / Scheduled jobs
+[WARN] core_flows / Fulfillment workflow
+[WARN] notifications / Unread count
+[WARN] ops / Repair workflow
 ```
 
 Admin API probe:
@@ -230,23 +268,26 @@ Admin API probe:
 Paste sanitized staging output here:
 
 ```text
-RENDER SHELL RESULT BEFORE HEALTH-PATH FIX
+RENDER SHELL RESULT AFTER HEALTH-PATH FIX
 
 Command:
 python manage.py deployment_check --production
 
 Result:
-FAIL - the only reported failure was the health endpoint check returning 301 because the command checked /api/health instead of /api/health/.
+PASS/WARN - no health endpoint failure remains.
 
-Relevant sanitized output:
-[FAIL] HEALTH: Health endpoint returned status 301.
+Confirmed PASS checks:
+[PASS] DEBUG
+[PASS] SECRET_KEY
+[PASS] ALLOWED_HOSTS
+[PASS] DATABASE
+[PASS] EMAIL
+[PASS] MIGRATIONS
+[PASS] HEALTH
 
-Fix applied in code:
-deployment_check now checks /api/health/ and follows redirects safely. Local verification after the fix shows:
-[PASS] HEALTH: Backend health endpoint /api/health/ responds with a request id.
-
-Expected after redeploy:
-No deployment_check failure from the health endpoint.
+Remaining WARN checks:
+[WARN] REDIS: Redis cache is disabled; production throttling should use Redis.
+[WARN] MEDIA_STORAGE: Local media storage is configured.
 ```
 
 ## verify_backup Output
@@ -257,7 +298,7 @@ Paste sanitized staging output here:
 Command:
 python manage.py verify_backup
 
-Observed/expected output shape for current Render staging:
+Render staging output:
 [PASS] database / Connectivity: Database connection is usable.
 [PASS] database / Critical tables: Critical BIDALS tables are present.
 [WARN] backup / Backup timestamp: No BACKUP_LAST_VERIFIED_AT value is configured; verify backups in the cloud provider.
@@ -265,14 +306,15 @@ Observed/expected output shape for current Render staging:
 Backup verification completed.
 ```
 
-Remaining readiness warnings after the health-path fix:
+Remaining readiness warnings:
 
 - Backup verification remains WARN until `BACKUP_LAST_VERIFIED_AT` is configured from real provider evidence.
 - Restore verification remains WARN until `BACKUP_LAST_RESTORE_TEST_AT` is configured after a non-production restore rehearsal.
 - Render free PostgreSQL still limits managed backup/restore proof; use a supported plan/provider path or a manual `pg_dump`/restore rehearsal.
 - Scheduled jobs still need Render cron execution evidence and `SCHEDULED_JOBS_CONFIGURED=true` only after that evidence exists.
-- Admin-only release UI/export/repair/audit checks still need a valid staging admin account.
-- Release check still contains manual WARN items for winner calculation, fulfillment, notifications mark-read, and repair workflow until those smoke checks are performed.
+- Redis remains disabled in staging; production throttling should use a managed Redis instance with `USE_REDIS_CACHE=True`.
+- Media storage remains local in staging; production lot images should use configured object storage.
+- Fulfillment, notification unread-count mark-read, repair workflow, and final admin workflow checks still need live smoke evidence.
 
 ## Post-Deploy Smoke Checklist
 
@@ -298,6 +340,10 @@ Remaining readiness warnings after the health-path fix:
 | Notifications | Notification created | WARN | Not verified because winner/fulfillment flows have not run. |
 | Notifications | Unread count updates | PASS | Bidder `GET /api/account/notifications/unread-count/` returned `200 OK` with `unread_count=0`. Mark-read still needs an actual notification. |
 | Notifications | Mark as read works | WARN | Not verified because no notification exists yet. |
+| Readiness | `release_check` core checks | PASS | Render shell `python manage.py release_check` now passes health endpoint, migrations, audit logs, and admin export installation/protection. Remaining items are WARN only. |
+| Readiness | `deployment_check --production` core checks | PASS | Render shell `python manage.py deployment_check --production` now passes DEBUG, SECRET_KEY, ALLOWED_HOSTS, DATABASE, EMAIL disabled safely, MIGRATIONS, and HEALTH. |
+| Readiness | `verify_backup` | WARN | Render shell `python manage.py verify_backup` passes database connectivity and critical tables, but warns because backup timestamp and restore-test timestamp are not configured. |
+| Readiness | Redis and media production readiness | WARN | `deployment_check --production` warns Redis is disabled and media storage is local. Production should use managed Redis and object storage before launch. |
 | Repair | Admin creates repair request | WARN | Blocked: staging admin login failed with `401`. |
 | Repair | Different admin approves repair | WARN | Blocked: admin credentials unavailable. |
 | Repair | Approved repair applies | WARN | Blocked: admin credentials unavailable and no winning bid exists. |
@@ -312,30 +358,28 @@ Remaining readiness warnings after the health-path fix:
 | --- | --- | --- | --- |
 | Critical | Staging bid endpoint returned `500` for authenticated valid bid, authenticated invalid bid, and anonymous bid probe. | Original failure reproduced on lot id `2`. After redeploy commit `cb9ca78`, fresh lot id `4` was tested with valid, invalid, and anonymous bid attempts. | FIXED AND VERIFIED - valid bid now returns `201 accepted`, invalid increment returns controlled `409 INVALID_INCREMENT`, anonymous bid returns controlled `401 UNAUTHENTICATED`, and lot state remains authoritative. |
 | Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-1.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
-| High | Documented staging admin credentials are not available. | `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`. | OPEN - run `seed_staging_data` or create staging admin securely. |
-| High | Scheduler, backup restore, and `release_check` still need real Render execution evidence. | Attempt Phase 17 completion without Render shell/job logs and managed PostgreSQL restore proof. | OPEN |
+| High | Documented staging admin credentials are not available. | `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`. | OPEN - run `create_staging_admin` in the Render backend shell with `BIDALS_ENV=staging` and `STAGING_ADMIN_PASSWORD` set for that shell only, or run `seed_staging_data` if full staging demo data is desired. |
+| High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | OPEN - Render shell `release_check`, `deployment_check --production`, and `verify_backup` have now run; scheduler and restore proof remain. |
 | Medium | Managed backup restore cannot be fully verified on current free Render Postgres setup. | Try to provide provider-managed backup/restore evidence from free staging database. | OPEN/WARN - use supported Render plan/provider restore path or manual non-production `pg_dump` restore rehearsal. |
-| Medium | `release_check` and `deployment_check --production` failed in Render shell because the health probe hit `/api/health` and received Django's trailing-slash `301` redirect. | Run `python manage.py release_check` or `python manage.py deployment_check --production` in Render shell before the readiness health-path fix. | FIXED IN CODE / PENDING REDEPLOY - readiness checks now use `/api/health/` explicitly and follow redirects safely without disabling `APPEND_SLASH`. |
+| Medium | `release_check` and `deployment_check --production` failed in Render shell because the health probe hit `/api/health` and received Django's trailing-slash `301` redirect. | Run `python manage.py release_check` or `python manage.py deployment_check --production` in Render shell before the readiness health-path fix. | FIXED AND VERIFIED - Render shell checks now pass the health endpoint after switching readiness checks to `/api/health/` with redirect-safe behavior. |
 
 ## Remaining Phase 17 Manual Checks
 
 - Optional: inspect Render backend logs for previous `POST /api/lots/{id}/bid/` 500s and confirm no new cache/Redis exceptions after commit `cb9ca78`.
-- Redeploy the backend with the readiness health-path fix for `release_check` and `deployment_check`.
-- Re-run `python manage.py deployment_check --production` in Render shell and confirm the health check is `PASS` for `/api/health/`.
-- Re-run `python manage.py release_check` in Render shell and confirm there is no health endpoint `FAIL`; record remaining WARN items only.
-- Confirm Redis/cache settings for staging bid throttling: `REDIS_URL`, `USE_REDIS_CACHE`, and Redis service connectivity. If no Redis is provisioned for staging, set `USE_REDIS_CACHE=False` and document that throttling is local-process only.
+- Provision/configure managed Redis for production throttling: set `REDIS_URL`, `USE_REDIS_CACHE=True`, and verify Redis connectivity. Current staging evidence warns Redis is disabled.
+- Configure object storage for production media uploads. Current staging evidence warns local media storage is configured.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
-- Run `python manage.py seed_staging_data` or otherwise create at least one staging admin user for admin-only checks.
+- Run `python manage.py create_staging_admin` in Render backend shell with `STAGING_ADMIN_PASSWORD` set for that shell/session, or run `python manage.py seed_staging_data` if full staging demo data is desired.
 - Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery.
 - Capture successful scheduler logs and confirm related audit/operations visibility.
 - Create or identify a managed PostgreSQL backup, or document the free Render Postgres limitation and run a non-production manual restore rehearsal when possible.
 - Restore the backup/dump into staging or a restore-test database.
-- Run `python manage.py verify_backup` after recording backup metadata.
-- Run `python manage.py release_check` and paste sanitized output above.
+- Re-run `python manage.py verify_backup` after recording backup metadata.
+- Re-run `python manage.py release_check` after scheduler, backup, fulfillment, notification, and repair workflow checks are complete.
 - Execute remaining smoke checks: scheduler close/winner calculation, fulfillment update, won-lots page, notification mark-read, repair workflow, admin export, audit visibility, and release-check UI.
 
 ## Final Readiness Assessment
 
 Status: NOT READY FOR PRODUCTION FROM PHASE 17 YET
 
-Reason: Initial Render deployment evidence exists and core health/auth/create/browse/bidding flows now pass after redeploy commit `cb9ca78`. `release_check` and `deployment_check` were run in Render shell and failed only because the commands hit `/api/health` and received a `301`; this is fixed in code and needs redeploy/re-run evidence. Admin access is unavailable, scheduler execution has not been proven, managed backup restore is limited by the current free Render Postgres setup, and final `release_check` output after the health-path fix has not been captured yet.
+Reason: Staging core is healthy: backend/frontend health, auth, auction/lot creation, browse, bidding, migrations, audit log readability, and admin export installation/protection have live Render evidence. Bidding smoke passes with server-authoritative accepted/rejected responses and safe lot state. Production is still blocked on managed Redis, scheduled job execution proof, production object/media storage, backup restore evidence, and final admin workflow checks for fulfillment, notification mark-read, repair workflow, audit visibility, and release-check UI.
