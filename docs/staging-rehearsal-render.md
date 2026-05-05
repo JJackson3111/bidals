@@ -112,7 +112,17 @@ Backend:
 - `MEDIA_ROOT=<staging media path>`
 - `LOT_IMAGE_MAX_UPLOAD_SIZE_MB=5`
 - `SERVE_LOCAL_MEDIA=True` only for staging/local demos when `USE_S3=False`; keep disabled for production
-- `USE_S3=True` only if object storage is configured for staging
+- `USE_S3=True` after Cloudflare R2/S3-compatible object storage is configured for staging or production
+- `AWS_ACCESS_KEY_ID=<Render secret: R2 access key>`
+- `AWS_SECRET_ACCESS_KEY=<Render secret: R2 secret key>`
+- `AWS_STORAGE_BUCKET_NAME=<R2 bucket name>`
+- `AWS_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`
+- `AWS_S3_REGION_NAME=auto`
+- `AWS_S3_CUSTOM_DOMAIN=<optional media domain>`
+- `AWS_QUERYSTRING_AUTH=True` for a private bucket with signed URLs, or `False` when using a public custom media domain
+- `AWS_S3_ADDRESSING_STYLE=path`
+- `AWS_S3_SIGNATURE_VERSION=s3v4`
+- `AWS_S3_CACHE_CONTROL=max-age=86400`
 - `BACKUP_PROVIDER=render`
 - `BACKUP_LAST_VERIFIED_AT=<ISO-8601 timestamp after backup is verified>`
 - `BACKUP_LAST_RESTORE_TEST_AT=<ISO-8601 timestamp after restore test passes>`
@@ -320,7 +330,7 @@ Remaining readiness warnings:
 - Render free PostgreSQL still limits managed backup/restore proof; use a supported plan/provider path or a manual `pg_dump`/restore rehearsal.
 - Scheduled jobs still need Render cron execution evidence and `SCHEDULED_JOBS_CONFIGURED=true` only after that evidence exists.
 - Redis remains disabled in staging; production throttling should use a managed Redis instance with `USE_REDIS_CACHE=True`.
-- Media storage remains local in staging; production lot images should use configured object storage.
+- Media storage remains local in staging unless `USE_S3=True`; production lot images should use configured Cloudflare R2/S3-compatible object storage so uploads survive Render redeploys.
 - Admin smoke checks now confirm audit logs, fulfillment records, outbound notifications, and repair workflow Django admin pages load. Frontend/admin export CSV and notification mark-read still need live smoke evidence.
 
 ## Post-Deploy Smoke Checklist
@@ -363,7 +373,7 @@ Remaining readiness warnings:
 | Admin ops | Audit logs visible | PASS | Django admin Audit logs page loads and shows recent entries. |
 | Admin ops | Release check UI works | WARN | Admin Django access is confirmed; release-check UI/API still needs direct smoke evidence. |
 | Seller flow | Create lot single-submit protection | PASS in code / redeploy needed | Create/edit lot forms now use a synchronous in-flight guard plus disabled submit/loading state so rapid double-clicks cannot submit duplicate `POST /api/lots/` calls. |
-| Seller flow | Lot image upload foundation | PASS in code / redeploy needed | Backend `LotImage` upload/delete/reorder APIs remain seller/admin protected. Upload requests use multipart `FormData` with JWT auth. The production Docker image now creates writable `/app/media`, upload storage failures return clear field errors, edit/create forms surface backend errors, and public lot cards/detail use uploaded image URLs when available. |
+| Seller flow | Lot image upload foundation | PASS in code / redeploy needed | Backend `LotImage` upload/delete/reorder APIs remain seller/admin protected. Upload requests use multipart `FormData` with JWT auth. Local fallback creates writable `/app/media`, and production should set `USE_S3=True` with Cloudflare R2/S3-compatible env vars so uploaded images persist across redeploys. |
 | Seller flow | Auction-derived lot availability | PASS in code / redeploy needed | Backend rejects `status=open` for draft, ended, or cancelled auctions. Scheduled auctions may prepare open lots, but bidding remains rejected until server time and auction status are live. Frontend helper text now says lots only become bid-open when the auction is live. |
 
 ## Issues Found
@@ -385,8 +395,8 @@ Remaining readiness warnings:
 
 - Optional: inspect Render backend logs for previous `POST /api/lots/{id}/bid/` 500s and confirm no new cache/Redis exceptions after commit `cb9ca78`.
 - Provision/configure managed Redis for production throttling: set `REDIS_URL`, `USE_REDIS_CACHE=True`, and verify Redis connectivity. Current staging evidence warns Redis is disabled.
-- Configure object storage for production media uploads. Current staging evidence warns local media storage is configured.
-- For staging-only image demos without S3/R2, set `SERVE_LOCAL_MEDIA=True` with `USE_S3=False`; keep `SERVE_LOCAL_MEDIA=False` in production. After redeploy, verify `/app/media` is writable by uploading from `/dashboard/lots/{id}/edit`.
+- Configure Cloudflare R2/S3-compatible object storage for persistent production media uploads. Set `USE_S3=True`, `SERVE_LOCAL_MEDIA=False`, and the `AWS_*` env vars listed above in Render.
+- For staging-only image demos without S3/R2, set `SERVE_LOCAL_MEDIA=True` with `USE_S3=False`; keep `SERVE_LOCAL_MEDIA=False` in production. After R2 configuration, verify upload persistence by uploading from `/dashboard/lots/{id}/edit`, redeploying/restarting Render, and confirming the image still loads.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
 - Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery.
 - Capture successful scheduler logs and confirm related audit/operations visibility.

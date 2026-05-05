@@ -906,8 +906,11 @@ Backend:
 - `AWS_STORAGE_BUCKET_NAME`: object storage bucket name.
 - `AWS_S3_REGION_NAME`: object storage region.
 - `AWS_S3_ENDPOINT_URL`: S3-compatible endpoint for R2, Spaces, or similar.
-- `AWS_S3_CUSTOM_DOMAIN`: optional media CDN/custom domain.
-- `AWS_QUERYSTRING_AUTH`: set according to your private/public media strategy.
+- `AWS_S3_CUSTOM_DOMAIN`: optional public media/custom domain, without secrets.
+- `AWS_QUERYSTRING_AUTH`: `True` for private buckets with signed image URLs, or `False` when using a public media domain.
+- `AWS_S3_ADDRESSING_STYLE`: S3 request addressing style, default `path` for S3-compatible providers such as R2.
+- `AWS_S3_SIGNATURE_VERSION`: S3 signature version, default `s3v4`.
+- `AWS_S3_CACHE_CONTROL`: cache-control header for uploaded lot images, default `max-age=86400`.
 - `BACKUP_PROVIDER`: provider label used in backup verification output.
 - `BACKUP_LAST_VERIFIED_AT`: ISO-8601 timestamp for the most recently verified backup.
 - `BACKUP_LAST_RESTORE_TEST_AT`: ISO-8601 timestamp for the most recent successful restore test.
@@ -932,6 +935,8 @@ E2E smoke tests:
 Storage validation:
 
 - When `USE_S3=True`, the backend fails fast unless `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`, and `AWS_S3_REGION_NAME` are set.
+- `AWS_S3_ENDPOINT_URL` must be a full HTTPS endpoint.
+- `AWS_S3_CUSTOM_DOMAIN`, when provided, is normalized to a hostname/path for generated media URLs.
 
 ## Production Commands
 
@@ -1179,7 +1184,7 @@ Useful docs: [Fly Dockerfile deploys](https://fly.io/docs/languages-and-framewor
 
 Django static files are collected into the backend image and served by WhiteNoise.
 
-Lot images can be represented as external JSON URLs or uploaded through the `LotImage` model at `POST /api/lots/{id}/images/`. Local development stores uploaded files under `MEDIA_ROOT` and serves them from `MEDIA_URL` while `DEBUG=True`. Production should set `USE_S3=True` and provide S3-compatible object storage credentials for S3, Cloudflare R2, DigitalOcean Spaces, or similar. Do not store important uploaded media only inside ephemeral container storage.
+Lot images can be represented as external JSON URLs or uploaded through the `LotImage` model at `POST /api/lots/{id}/images/`. Local development/staging fallback stores uploaded files under `MEDIA_ROOT` and serves them from `MEDIA_URL` only when `SERVE_LOCAL_MEDIA=True` and `USE_S3=False`. Production should set `USE_S3=True` and provide S3-compatible object storage credentials for S3, Cloudflare R2, DigitalOcean Spaces, or similar. Do not store important uploaded media only inside ephemeral container storage.
 
 Image management endpoints:
 
@@ -1203,26 +1208,41 @@ Only the lot's seller or an admin can upload, delete, or reorder lot images. Pub
 
 ### Cloudflare R2 Media Setup
 
-Use R2 as S3-compatible storage:
+Use R2 as S3-compatible storage so uploaded lot images persist across Render redeploys/restarts:
 
 1. Create an R2 bucket for BIDALS media.
-2. Create an R2 API token with object read/write access for that bucket.
-3. Set CORS on the bucket to allow your frontend origin to read media URLs.
-4. Decide public vs private media. The MVP assumes public image URLs for visible lots; private media needs signed URL handling later.
-5. Configure backend env vars:
+2. Create an R2 S3 API token with object read/write access scoped to that bucket.
+3. Copy the R2 S3 API endpoint in the form `https://<account-id>.r2.cloudflarestorage.com`.
+4. Use region `auto`.
+5. Decide media URL strategy:
+   - Private bucket: set `AWS_QUERYSTRING_AUTH=True`. The backend returns signed image URLs; storage secrets stay server-side.
+   - Public/custom domain: configure an R2 custom/public domain, set `AWS_S3_CUSTOM_DOMAIN=<media-domain>`, and set `AWS_QUERYSTRING_AUTH=False`.
+6. Configure backend env vars in Render:
 
 ```bash
 USE_S3=True
+SERVE_LOCAL_MEDIA=False
 AWS_ACCESS_KEY_ID=<r2-access-key>
 AWS_SECRET_ACCESS_KEY=<r2-secret-key>
 AWS_STORAGE_BUCKET_NAME=<bucket-name>
 AWS_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
 AWS_S3_REGION_NAME=auto
 AWS_S3_CUSTOM_DOMAIN=<optional-public-media-domain>
-AWS_QUERYSTRING_AUTH=False
+AWS_QUERYSTRING_AUTH=True
+AWS_S3_ADDRESSING_STYLE=path
+AWS_S3_SIGNATURE_VERSION=s3v4
+AWS_S3_CACHE_CONTROL=max-age=86400
 ```
 
-Never expose R2 credentials to the frontend. The frontend uses only public image URLs returned by the backend.
+Never expose R2 credentials to the frontend. The frontend uses only image URLs returned by the backend. If using a public/custom media domain, ensure the bucket/domain policy allows browser reads for visible lot images. If using signed URLs, reloading the lot/feed fetches fresh URLs from the backend.
+
+Render persistence test:
+
+1. Deploy the backend with `USE_S3=True` and the R2 env vars above.
+2. Log in as seller/admin and upload a lot image from `/dashboard/lots/{id}/edit`.
+3. Confirm the lot detail/feed renders the uploaded image.
+4. Redeploy or restart the Render backend service.
+5. Reload the lot detail/feed. The image should still load because the file is stored in R2, not the Render container filesystem.
 
 ## Edit Flows
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
-from bidals.storage import validate_s3_settings
+from bidals.storage import build_s3_storage_options
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ROOT_DIR = BASE_DIR.parent
@@ -115,24 +115,30 @@ if USE_S3:
     AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="")
     AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
     AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default=None)
-    validate_s3_settings(
+    AWS_S3_ADDRESSING_STYLE = env("AWS_S3_ADDRESSING_STYLE", default="path")
+    AWS_S3_SIGNATURE_VERSION = env("AWS_S3_SIGNATURE_VERSION", default="s3v4")
+    AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=not bool(AWS_S3_CUSTOM_DOMAIN))
+    AWS_S3_CACHE_CONTROL = env("AWS_S3_CACHE_CONTROL", default="max-age=86400")
+    S3_STORAGE_OPTIONS = build_s3_storage_options(
         {
             "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
             "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
             "AWS_STORAGE_BUCKET_NAME": AWS_STORAGE_BUCKET_NAME,
             "AWS_S3_REGION_NAME": AWS_S3_REGION_NAME,
             "AWS_S3_ENDPOINT_URL": AWS_S3_ENDPOINT_URL,
+            "AWS_S3_CUSTOM_DOMAIN": AWS_S3_CUSTOM_DOMAIN,
+            "AWS_S3_ADDRESSING_STYLE": AWS_S3_ADDRESSING_STYLE,
+            "AWS_S3_SIGNATURE_VERSION": AWS_S3_SIGNATURE_VERSION,
+            "AWS_QUERYSTRING_AUTH": AWS_QUERYSTRING_AUTH,
+            "AWS_S3_OBJECT_PARAMETERS": {"CacheControl": AWS_S3_CACHE_CONTROL},
         }
     )
-    AWS_S3_FILE_OVERWRITE = False
-    AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=False)
-    AWS_S3_SIGNATURE_VERSION = "s3v4"
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": S3_STORAGE_OPTIONS,
     }
-    if AWS_S3_CUSTOM_DOMAIN:
-        MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+    if S3_STORAGE_OPTIONS.get("custom_domain"):
+        MEDIA_URL = f"https://{S3_STORAGE_OPTIONS['custom_domain']}/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
