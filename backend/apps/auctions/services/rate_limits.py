@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+import logging
 import time
 
 from django.conf import settings
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -13,6 +16,7 @@ class BidRateLimitResult:
     retry_after: int
     scope: str
     key: str
+    cache_available: bool = True
 
 
 def check_bid_rate_limit(request) -> BidRateLimitResult:
@@ -33,7 +37,28 @@ def check_bid_rate_limit(request) -> BidRateLimitResult:
     retry_after = max(1, window_seconds - int(now % window_seconds))
     key = f"bidals:bid-rate:{scope}:{identifier}:{bucket}"
 
-    count = _increment_key(key, timeout=window_seconds + 5)
+    try:
+        count = _increment_key(key, timeout=window_seconds + 5)
+    except Exception as exc:
+        logger.warning(
+            "Bid rate-limit cache unavailable; allowing bid attempt",
+            extra={
+                "event": "bid_rate_limit_cache_unavailable",
+                "scope": scope,
+                "key": key,
+                "error_type": type(exc).__name__,
+            },
+        )
+        return BidRateLimitResult(
+            allowed=True,
+            limit=limit,
+            remaining=limit,
+            retry_after=0,
+            scope=scope,
+            key=key,
+            cache_available=False,
+        )
+
     remaining = max(0, limit - count)
 
     return BidRateLimitResult(

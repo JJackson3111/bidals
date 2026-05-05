@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -15,6 +16,7 @@ from apps.auctions.models import (
     AuctionStatus,
     Bid,
     BidRejectionReason,
+    BidStatus,
     Lot,
     LotStatus,
 )
@@ -110,4 +112,63 @@ def test_anonymous_bid_attempts_are_rate_limited_after_first_rejection():
         action=AuditAction.BID_REJECTED,
         metadata__reason=BidRejectionReason.RATE_LIMITED,
         metadata__bidder_id=None,
+    ).exists()
+
+
+def test_valid_bid_succeeds_when_rate_limit_cache_is_unavailable():
+    lot = create_live_lot()
+    bidder = create_user("cache_outage_bidder")
+    client = APIClient()
+    client.force_authenticate(user=bidder)
+
+    with patch("apps.auctions.services.rate_limits.cache.add", side_effect=ConnectionError("redis unavailable")):
+        response = client.post(f"/api/lots/{lot.id}/bid/", {"amount": "100.00"}, format="json")
+
+    lot.refresh_from_db()
+    bid = Bid.objects.get(lot=lot, bidder=bidder)
+    assert response.status_code == 201
+    assert response.data["status"] == BidStatus.ACCEPTED
+    assert response.data["current_price"] == "100.00"
+    assert bid.status == BidStatus.ACCEPTED
+    assert lot.current_price == Decimal("100.00")
+    assert AuditLog.objects.filter(action=AuditAction.BID_ACCEPTED, entity_id=str(bid.id)).exists()
+
+
+def test_invalid_bid_returns_rejection_when_rate_limit_cache_is_unavailable():
+    lot = create_live_lot()
+    bidder = create_user("cache_outage_invalid_bidder")
+    client = APIClient()
+    client.force_authenticate(user=bidder)
+
+    with patch("apps.auctions.services.rate_limits.cache.add", side_effect=ConnectionError("redis unavailable")):
+        response = client.post(f"/api/lots/{lot.id}/bid/", {"amount": "95.00"}, format="json")
+
+    lot.refresh_from_db()
+    bid = Bid.objects.get(lot=lot, bidder=bidder)
+    assert response.status_code == 409
+    assert response.data["status"] == BidStatus.REJECTED
+    assert response.data["reason"] == BidRejectionReason.INVALID_INCREMENT
+    assert response.data["current_price"] == "90.00"
+    assert bid.status == BidStatus.REJECTED
+    assert bid.rejection_reason == BidRejectionReason.INVALID_INCREMENT
+    assert lot.current_price == Decimal("90.00")
+    assert AuditLog.objects.filter(action=AuditAction.BID_REJECTED, entity_id=str(bid.id)).exists()
+
+
+def test_anonymous_bid_returns_controlled_rejection_when_rate_limit_cache_is_unavailable():
+    lot = create_live_lot()
+    client = APIClient()
+
+    with patch("apps.auctions.services.rate_limits.cache.add", side_effect=ConnectionError("redis unavailable")):
+        response = client.post(f"/api/lots/{lot.id}/bid/", {"amount": "100.00"}, format="json")
+
+    lot.refresh_from_db()
+    assert response.status_code == 401
+    assert response.data["status"] == BidStatus.REJECTED
+    assert response.data["reason"] == BidRejectionReason.UNAUTHENTICATED
+    assert lot.current_price == Decimal("90.00")
+    assert not Bid.objects.filter(lot=lot).exists()
+    assert AuditLog.objects.filter(
+        action=AuditAction.BID_REJECTED,
+        metadata__reason=BidRejectionReason.UNAUTHENTICATED,
     ).exists()
