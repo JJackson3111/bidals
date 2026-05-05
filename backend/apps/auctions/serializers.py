@@ -11,6 +11,7 @@ from apps.auctions.models import (
     FulfillmentStatus,
     Lot,
     LotImage,
+    LotStatus,
     OutcomeRepairComment,
     OutcomeRepairRequest,
 )
@@ -145,9 +146,21 @@ class LotSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        auction = attrs.get("auction", getattr(self.instance, "auction", None))
+        lot_status = attrs.get("status", getattr(self.instance, "status", LotStatus.DRAFT))
         starting_price = attrs.get("starting_price", getattr(self.instance, "starting_price", None))
         reserve_price = attrs.get("reserve_price", getattr(self.instance, "reserve_price", None))
         bid_increment = attrs.get("bid_increment", getattr(self.instance, "bid_increment", None))
+
+        if lot_status == LotStatus.OPEN and auction and auction.status not in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE}:
+            raise serializers.ValidationError(
+                {
+                    "status": (
+                        "Lots can only be marked open when the auction is scheduled or live. "
+                        "Lots only become bid-open when the auction is live."
+                    )
+                }
+            )
 
         if starting_price is not None and starting_price < Decimal("0.00"):
             raise serializers.ValidationError({"starting_price": "Starting price must be zero or positive."})

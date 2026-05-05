@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 
@@ -14,6 +14,7 @@ import type { Auction, LotStatus } from "@/lib/types";
 export default function NewLotPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const submitInFlightRef = useRef(false);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [auctionId, setAuctionId] = useState("");
   const [title, setTitle] = useState("");
@@ -24,6 +25,7 @@ export default function NewLotPage() {
   const [status, setStatus] = useState<LotStatus>("draft");
   const [externalImageUrl, setExternalImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageAltText, setImageAltText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,8 +53,43 @@ export default function NewLotPage() {
     return auctions.filter((auction) => auction.created_by === user.id);
   }, [auctions, user]);
 
+  const selectedAuction = useMemo(
+    () => ownedAuctions.find((auction) => String(auction.id) === auctionId) ?? null,
+    [auctionId, ownedAuctions],
+  );
+  const openStatusAllowed = selectedAuction?.status === "live" || selectedAuction?.status === "scheduled";
+  const statusHelp = selectedAuction
+    ? selectedAuction.status === "live"
+      ? "This lot can accept bids only while the auction is live and the backend accepts the bid."
+      : selectedAuction.status === "scheduled"
+        ? "Lots only become bid-open when the auction is live."
+        : "This auction is not live. Keep the lot as draft or closed until the auction can accept bids."
+    : "Select an auction before choosing lot availability. Lots only become bid-open when the auction is live.";
+  const previewUrl = imagePreviewUrl || externalImageUrl;
+  const submitDisabled = isSubmitting || !auctionId;
+
+  useEffect(() => {
+    if (status === "open" && selectedAuction && !openStatusAllowed) {
+      setStatus("draft");
+    }
+  }, [openStatusAllowed, selectedAuction, status]);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitInFlightRef.current) return;
+
+    submitInFlightRef.current = true;
     setError(null);
     setIsSubmitting(true);
 
@@ -68,15 +105,21 @@ export default function NewLotPage() {
         images: externalImageUrl ? [externalImageUrl] : [],
       });
       if (imageFile) {
-        await api.uploadLotImage(lot.id, {
-          file: imageFile,
-          altText: imageAltText || title,
-        });
+        try {
+          await api.uploadLotImage(lot.id, {
+            file: imageFile,
+            altText: imageAltText || title,
+          });
+        } catch {
+          router.push(`/dashboard/lots/${lot.id}/edit?imageUpload=failed`);
+          return;
+        }
       }
       router.push(`/lots/${lot.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to create lot.");
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -86,7 +129,15 @@ export default function NewLotPage() {
       <DashboardLayout title="Create lot">
         {isLoading ? <LoadingState label="Loading auctions" /> : null}
         {!isLoading ? (
-          <form className="form-panel" onSubmit={handleSubmit}>
+          <form className="form-panel" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+            {previewUrl ? (
+              <div
+                className="form-image-preview"
+                style={{ backgroundImage: `url("${previewUrl}")` }}
+                role="img"
+                aria-label={imageAltText || title || "Lot image preview"}
+              />
+            ) : null}
             <div className="form-grid">
               <div className="form-field">
                 <label htmlFor="auction">Auction</label>
@@ -124,9 +175,10 @@ export default function NewLotPage() {
                 <label htmlFor="status">Status</label>
                 <select id="status" value={status} onChange={(event) => setStatus(event.target.value as LotStatus)}>
                   <option value="draft">Draft</option>
-                  <option value="open">Open</option>
+                  <option value="open" disabled={!openStatusAllowed}>Open</option>
                   <option value="closed">Closed</option>
                 </select>
+                <span className="form-help">{statusHelp}</span>
               </div>
               <div className="form-field">
                 <label htmlFor="external-image">External image URL</label>
@@ -136,7 +188,13 @@ export default function NewLotPage() {
               <div className="form-field">
                 <label htmlFor="image-file">Upload image</label>
                 <span className="form-help">Local dev stores this under media; production should use object storage.</span>
-                <input id="image-file" accept="image/*" type="file" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} />
+                <input
+                  id="image-file"
+                  accept="image/*"
+                  disabled={isSubmitting}
+                  type="file"
+                  onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="image-alt">Image alt text</label>
@@ -144,7 +202,7 @@ export default function NewLotPage() {
               </div>
             </div>
             {error ? <div className="form-error" role="alert">{error}</div> : null}
-            <button className="primary-button" disabled={isSubmitting} type="submit">
+            <button className="primary-button" disabled={submitDisabled} type="submit">
               <Save size={18} aria-hidden="true" />
               {isSubmitting ? "Creating" : "Create lot"}
             </button>

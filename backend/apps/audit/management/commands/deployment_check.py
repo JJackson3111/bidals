@@ -8,6 +8,7 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.audit.models import AuditAction, AuditLog
+from apps.audit.services.readiness import runtime_environment
 
 HEALTH_CHECK_PATH = "/api/health/"
 
@@ -111,6 +112,9 @@ def _check_redis(*, production: bool) -> DeploymentCheckResult:
 def _check_storage(*, production: bool) -> DeploymentCheckResult:
     if getattr(settings, "USE_S3", False):
         return DeploymentCheckResult("PASS", "MEDIA_STORAGE", "Object storage is enabled.")
+    if getattr(settings, "SERVE_LOCAL_MEDIA", False):
+        status = "FAIL" if runtime_environment() == "production" else "WARN"
+        return DeploymentCheckResult(status, "MEDIA_STORAGE", "Local media serving is enabled; use this only for staging/local demos.")
     status = "WARN" if production else "PASS"
     return DeploymentCheckResult(status, "MEDIA_STORAGE", "Local media storage is configured.")
 

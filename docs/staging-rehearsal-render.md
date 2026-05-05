@@ -75,6 +75,7 @@ Confirmed staging evidence so far:
 | Bid endpoint after `cb9ca78` redeploy | PASS | Fresh smoke lot id `4`: valid bid `15.00` returned `201 accepted`, invalid bid `16.00` returned `409 INVALID_INCREMENT`, anonymous bid `20.00` returned `401 UNAUTHENTICATED`, and `current_price` moved only from `10.00` to `15.00`. |
 | Render `release_check` | PASS/WARN | Render shell check now passes health endpoint, migrations, audit logs, and admin export installation/protection. Remaining WARN items are backup, scheduled jobs, fulfillment, repair workflow, and notification unread count. |
 | Render `deployment_check --production` | PASS/WARN | Render shell check now passes DEBUG, SECRET_KEY, ALLOWED_HOSTS, DATABASE, EMAIL disabled safely, MIGRATIONS, and HEALTH. Remaining WARN items are Redis disabled and local media storage. |
+| Django admin access | PASS | `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. Django admin shows Users, Auctions, Bids, Fulfillment records, Lots, Audit logs, Outbound notifications, Outcome repair requests/comments, and token blacklist models. |
 
 ## Staging Environment Variables
 
@@ -107,6 +108,10 @@ Backend:
 - `SCHEDULED_JOBS_CONFIGURED=True` after schedulers are configured
 - `EMAIL_NOTIFICATIONS_ENABLED=False` unless staging email is deliberately configured
 - `DEFAULT_FROM_EMAIL=<staging sender if email enabled>`
+- `MEDIA_URL=/media/`
+- `MEDIA_ROOT=<staging media path>`
+- `LOT_IMAGE_MAX_UPLOAD_SIZE_MB=5`
+- `SERVE_LOCAL_MEDIA=True` only for staging/local demos when `USE_S3=False`; keep disabled for production
 - `USE_S3=True` only if object storage is configured for staging
 - `BACKUP_PROVIDER=render`
 - `BACKUP_LAST_VERIFIED_AT=<ISO-8601 timestamp after backup is verified>`
@@ -258,10 +263,12 @@ Remaining WARN checks:
 [WARN] ops / Repair workflow
 ```
 
-Admin API probe:
+Admin access probe:
 
-- `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401` with `No active account found with the given credentials`.
-- `GET /api/admin/release-check/` was not executed because no admin token was available.
+- Earlier `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401` before the staging admin setup was repaired.
+- Current evidence: `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log into Django admin.
+- Django admin model visibility confirmed: Users, Auctions, Bids, Fulfillment records, Lots, Audit logs, Outbound notifications, Outcome repair requests/comments, and token blacklist models.
+- API/JWT admin smoke checks still need direct validation through the frontend or API client.
 
 ## deployment_check Output
 
@@ -314,7 +321,7 @@ Remaining readiness warnings:
 - Scheduled jobs still need Render cron execution evidence and `SCHEDULED_JOBS_CONFIGURED=true` only after that evidence exists.
 - Redis remains disabled in staging; production throttling should use a managed Redis instance with `USE_REDIS_CACHE=True`.
 - Media storage remains local in staging; production lot images should use configured object storage.
-- Fulfillment, notification unread-count mark-read, repair workflow, and final admin workflow checks still need live smoke evidence.
+- Admin smoke checks now confirm audit logs, fulfillment records, outbound notifications, and repair workflow Django admin pages load. Frontend/admin export CSV and notification mark-read still need live smoke evidence.
 
 ## Post-Deploy Smoke Checklist
 
@@ -344,13 +351,20 @@ Remaining readiness warnings:
 | Readiness | `deployment_check --production` core checks | PASS | Render shell `python manage.py deployment_check --production` now passes DEBUG, SECRET_KEY, ALLOWED_HOSTS, DATABASE, EMAIL disabled safely, MIGRATIONS, and HEALTH. |
 | Readiness | `verify_backup` | WARN | Render shell `python manage.py verify_backup` passes database connectivity and critical tables, but warns because backup timestamp and restore-test timestamp are not configured. |
 | Readiness | Redis and media production readiness | WARN | `deployment_check --production` warns Redis is disabled and media storage is local. Production should use managed Redis and object storage before launch. |
-| Repair | Admin creates repair request | WARN | Blocked: staging admin login failed with `401`. |
-| Repair | Different admin approves repair | WARN | Blocked: admin credentials unavailable. |
-| Repair | Approved repair applies | WARN | Blocked: admin credentials unavailable and no winning bid exists. |
-| Repair | Audit logs created | WARN | Blocked: admin credentials unavailable; audit endpoint not verified. |
-| Admin ops | Admin export downloads CSV | WARN | Blocked: staging admin login failed with `401`. |
-| Admin ops | Audit logs visible | WARN | Blocked: staging admin login failed with `401`. |
-| Admin ops | Release check UI works | WARN | Admin release-check API/UI not verified because no admin token was available. |
+| Admin ops | Django admin access | PASS | `https://bidals.onrender.com/admin/` loads successfully; logged in as `staging_admin`; Django admin shows core BIDALS and auth/token blacklist models. |
+| Fulfillment | Fulfillment records visible | PASS | Django admin Fulfillment records page loads without errors; no entries yet. |
+| Notifications | Outbound notifications visible | PASS | Django admin Outbound notifications page loads without errors; no entries yet. |
+| Repair | Admin creates repair request | WARN | Outcome repair request/comment admin pages load, but creating a repair request was not tested. |
+| Repair | Different admin approves repair | WARN | Not verified; requires a second admin account and a repair request. |
+| Repair | Approved repair applies | WARN | Not verified; requires eligible accepted bid/outcome data and repair request approval. |
+| Repair | Repair workflow access loads | PASS | Django admin Outcome repair requests and Outcome repair comments pages load without errors; no entries yet. |
+| Repair | Audit logs created | WARN | Audit logs page is visible, but repair-specific audit creation still needs workflow smoke evidence. |
+| Admin ops | Admin export downloads CSV | WARN | `release_check` reports admin export installed/protected, but CSV download still needs a browser/API smoke check. |
+| Admin ops | Audit logs visible | PASS | Django admin Audit logs page loads and shows recent entries. |
+| Admin ops | Release check UI works | WARN | Admin Django access is confirmed; release-check UI/API still needs direct smoke evidence. |
+| Seller flow | Create lot single-submit protection | PASS in code / redeploy needed | Create/edit lot forms now use a synchronous in-flight guard plus disabled submit/loading state so rapid double-clicks cannot submit duplicate `POST /api/lots/` calls. |
+| Seller flow | Lot image upload foundation | PASS in code / redeploy needed | Backend `LotImage` upload/delete/reorder APIs already exist and remain seller/admin protected. Create/edit lot forms now show image previews and route to edit if post-create upload needs retry. Public lot cards/detail use uploaded image URLs when available. |
+| Seller flow | Auction-derived lot availability | PASS in code / redeploy needed | Backend rejects `status=open` for draft, ended, or cancelled auctions. Scheduled auctions may prepare open lots, but bidding remains rejected until server time and auction status are live. Frontend helper text now says lots only become bid-open when the auction is live. |
 
 ## Issues Found
 
@@ -358,28 +372,32 @@ Remaining readiness warnings:
 | --- | --- | --- | --- |
 | Critical | Staging bid endpoint returned `500` for authenticated valid bid, authenticated invalid bid, and anonymous bid probe. | Original failure reproduced on lot id `2`. After redeploy commit `cb9ca78`, fresh lot id `4` was tested with valid, invalid, and anonymous bid attempts. | FIXED AND VERIFIED - valid bid now returns `201 accepted`, invalid increment returns controlled `409 INVALID_INCREMENT`, anonymous bid returns controlled `401 UNAUTHENTICATED`, and lot state remains authoritative. |
 | Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-1.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
-| High | Documented staging admin credentials are not available. | `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`. | OPEN - run `create_staging_admin` in the Render backend shell with `BIDALS_ENV=staging` and `STAGING_ADMIN_PASSWORD` set for that shell only, or run `seed_staging_data` if full staging demo data is desired. |
+| High | Documented staging admin credentials were not available. | Earlier `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`; staging admin setup was then repaired. | FIXED AND VERIFIED - `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. |
 | High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | OPEN - Render shell `release_check`, `deployment_check --production`, and `verify_backup` have now run; scheduler and restore proof remain. |
 | Medium | Managed backup restore cannot be fully verified on current free Render Postgres setup. | Try to provide provider-managed backup/restore evidence from free staging database. | OPEN/WARN - use supported Render plan/provider restore path or manual non-production `pg_dump` restore rehearsal. |
 | Medium | `release_check` and `deployment_check --production` failed in Render shell because the health probe hit `/api/health` and received Django's trailing-slash `301` redirect. | Run `python manage.py release_check` or `python manage.py deployment_check --production` in Render shell before the readiness health-path fix. | FIXED AND VERIFIED - Render shell checks now pass the health endpoint after switching readiness checks to `/api/health/` with redirect-safe behavior. |
+| High | Create lot form could create duplicate lots during demo flow. | Rapid repeat submit, or retry after a post-create image-upload failure, could send another lot create request. | FIXED IN CODE / PENDING REDEPLOY - frontend now has a synchronous in-flight submit guard, disabled submit state, and post-create image upload retry path that does not create another lot. |
+| Medium | Seller lot form could imply a draft auction lot was bid-open. | Create/edit lot form allowed selecting `open` without clearly deriving availability from auction status. | FIXED IN CODE / PENDING REDEPLOY - backend rejects open lots for draft/ended/cancelled auctions; frontend disables misleading open state and explains auction-live requirement. |
+| Medium | Lot image upload needed demo-readiness polish. | Seller create/edit flow had upload hooks but limited feedback/preview, and local media serving was not explicitly staging-controlled. | FIXED IN CODE / PENDING REDEPLOY - image previews added, upload retry path improved, local media serving controlled by `SERVE_LOCAL_MEDIA`, and production object storage remains required. |
 
 ## Remaining Phase 17 Manual Checks
 
 - Optional: inspect Render backend logs for previous `POST /api/lots/{id}/bid/` 500s and confirm no new cache/Redis exceptions after commit `cb9ca78`.
 - Provision/configure managed Redis for production throttling: set `REDIS_URL`, `USE_REDIS_CACHE=True`, and verify Redis connectivity. Current staging evidence warns Redis is disabled.
 - Configure object storage for production media uploads. Current staging evidence warns local media storage is configured.
+- For staging-only image demos without S3/R2, set `SERVE_LOCAL_MEDIA=True` with `USE_S3=False`; keep `SERVE_LOCAL_MEDIA=False` in production.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
-- Run `python manage.py create_staging_admin` in Render backend shell with `STAGING_ADMIN_PASSWORD` set for that shell/session, or run `python manage.py seed_staging_data` if full staging demo data is desired.
 - Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery.
 - Capture successful scheduler logs and confirm related audit/operations visibility.
 - Create or identify a managed PostgreSQL backup, or document the free Render Postgres limitation and run a non-production manual restore rehearsal when possible.
 - Restore the backup/dump into staging or a restore-test database.
 - Re-run `python manage.py verify_backup` after recording backup metadata.
 - Re-run `python manage.py release_check` after scheduler, backup, fulfillment, notification, and repair workflow checks are complete.
-- Execute remaining smoke checks: scheduler close/winner calculation, fulfillment update, won-lots page, notification mark-read, repair workflow, admin export, audit visibility, and release-check UI.
+- After redeploy, re-test seller create lot: one click creates exactly one lot, the submit button disables while saving, image upload/preview works, and draft auctions cannot create truly bid-open lots.
+- Execute remaining smoke checks: admin export CSV download, scheduler close/winner calculation, fulfillment update, won-lots page, notification mark-read, repair request create/approve/apply if practical, and release-check UI.
 
 ## Final Readiness Assessment
 
 Status: NOT READY FOR PRODUCTION FROM PHASE 17 YET
 
-Reason: Staging core is healthy: backend/frontend health, auth, auction/lot creation, browse, bidding, migrations, audit log readability, and admin export installation/protection have live Render evidence. Bidding smoke passes with server-authoritative accepted/rejected responses and safe lot state. Production is still blocked on managed Redis, scheduled job execution proof, production object/media storage, backup restore evidence, and final admin workflow checks for fulfillment, notification mark-read, repair workflow, audit visibility, and release-check UI.
+Reason: Staging core is healthy: backend/frontend health, auth, auction/lot creation, browse, bidding, migrations, audit log readability, Django admin login, audit log visibility, fulfillment/notification/repair admin page access, and admin export installation/protection have live Render evidence. Bidding smoke passes with server-authoritative accepted/rejected responses and safe lot state. Production is still blocked on managed Redis, scheduled job execution proof, production object/media storage, backup restore evidence, admin export CSV verification, and final workflow checks for fulfillment updates, notification mark-read, repair request lifecycle, and release-check UI.

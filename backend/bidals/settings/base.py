@@ -95,6 +95,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = env("MEDIA_URL", default="/media/")
 MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 LOT_IMAGE_MAX_UPLOAD_SIZE_MB = env.int("LOT_IMAGE_MAX_UPLOAD_SIZE_MB", default=5)
+SERVE_LOCAL_MEDIA = env.bool("SERVE_LOCAL_MEDIA", default=DEBUG)
 
 STORAGES = {
     "default": {

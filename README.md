@@ -1474,6 +1474,7 @@ If auction closing or winner calculation fails:
 - Use `/dashboard/admin/release-check` before releases and after significant incident recovery.
 - Run `verify_backup` after provider backup changes and before production releases.
 - Keep database backups enabled before running real auctions.
+- Use `SERVE_LOCAL_MEDIA=True` only for local/staging image demos when `USE_S3=False`; keep it disabled in production.
 - Future uploaded lot media should use object storage, not container disk.
 
 ## MVP Limitations

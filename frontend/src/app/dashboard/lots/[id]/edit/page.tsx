@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Save, Trash2, Upload } from "lucide-react";
 
@@ -14,6 +14,7 @@ import type { Bid, Lot, LotStatus, UpdateLotInput } from "@/lib/types";
 export default function EditLotPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const submitInFlightRef = useRef(false);
   const [lot, setLot] = useState<Lot | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
   const [title, setTitle] = useState("");
@@ -24,6 +25,7 @@ export default function EditLotPage() {
   const [lotStatus, setLotStatus] = useState<LotStatus>("draft");
   const [externalImageUrl, setExternalImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [imageAltText, setImageAltText] = useState("");
   const [imageActionId, setImageActionId] = useState<number | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -61,10 +63,43 @@ export default function EditLotPage() {
 
   const hasAcceptedBids = useMemo(() => bids.some((bid) => bid.status === "accepted"), [bids]);
   const primaryImageUrl = lot ? getLotPrimaryImageUrl(lot) : null;
+  const previewImageUrl = imagePreviewUrl || externalImageUrl || primaryImageUrl;
+  const openStatusAllowed = lot?.auction_status === "live" || lot?.auction_status === "scheduled";
+  const statusHelp = lot
+    ? lot.auction_status === "live"
+      ? "This lot can accept bids only while the auction is live and the backend accepts the bid."
+      : lot.auction_status === "scheduled"
+        ? "Lots only become bid-open when the auction is live."
+        : "This auction is not live. Keep the lot as draft or closed until the auction can accept bids."
+    : "Lots only become bid-open when the auction is live.";
   const sortedImages = useMemo(
     () => [...(lot?.uploaded_images ?? [])].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id),
     [lot?.uploaded_images],
   );
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.get("imageUpload") === "failed") {
+      setImageError("Lot was created, but the image upload did not finish. Upload the image again here.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lotStatus === "open" && lot && !openStatusAllowed) {
+      setLotStatus("draft");
+    }
+  }, [lot, lotStatus, openStatusAllowed]);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
 
   async function refreshLot() {
     const lotData = await api.getLot(params.id);
@@ -75,7 +110,9 @@ export default function EditLotPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!lot) return;
+    if (submitInFlightRef.current) return;
 
+    submitInFlightRef.current = true;
     setError(null);
     setSuccess(null);
     setIsSubmitting(true);
@@ -106,6 +143,7 @@ export default function EditLotPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to save lot.");
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -160,9 +198,9 @@ export default function EditLotPage() {
         {isLoading ? <LoadingState label="Loading lot" /> : null}
         {!isLoading && error ? <ErrorState message={error} /> : null}
         {!isLoading && !error && lot ? (
-          <form className="form-panel" onSubmit={handleSubmit}>
-            {primaryImageUrl ? (
-              <div className="form-image-preview" style={{ backgroundImage: `url("${primaryImageUrl}")` }} role="img" aria-label={lot.title} />
+          <form className="form-panel" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+            {previewImageUrl ? (
+              <div className="form-image-preview" style={{ backgroundImage: `url("${previewImageUrl}")` }} role="img" aria-label={imageAltText || lot.title} />
             ) : null}
             <section className="image-manager" aria-label="Lot images">
               <div className="section-heading">
@@ -274,11 +312,12 @@ export default function EditLotPage() {
                 <label htmlFor="status">Status</label>
                 <select id="status" value={lotStatus} onChange={(event) => setLotStatus(event.target.value as LotStatus)}>
                   <option value="draft">Draft</option>
-                  <option value="open">Open</option>
+                  <option value="open" disabled={!openStatusAllowed}>Open</option>
                   <option value="closed">Closed</option>
                   <option value="sold">Sold</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
+                <span className="form-help">{statusHelp}</span>
               </div>
               <div className="form-field">
                 <label htmlFor="external-image">External image URL</label>
@@ -288,7 +327,13 @@ export default function EditLotPage() {
               <div className="form-field">
                 <label htmlFor="image-file">Upload image</label>
                 <span className="form-help">Local development stores uploads under media; production should use object storage.</span>
-                <input id="image-file" accept="image/*" type="file" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} />
+                <input
+                  id="image-file"
+                  accept="image/*"
+                  disabled={isSubmitting}
+                  type="file"
+                  onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="image-alt">Image alt text</label>
