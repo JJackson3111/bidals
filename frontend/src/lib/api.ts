@@ -100,7 +100,15 @@ function extractErrorMessage(body: unknown): string | null {
 }
 
 function unwrapResults<T>(response: PaginatedResponse<T> | T[]): T[] {
-  return Array.isArray(response) ? response : response.results;
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (response && typeof response === "object" && Array.isArray(response.results)) {
+    return response.results;
+  }
+
+  throw new ApiError("Unexpected API response shape.", 0, { detail: "Expected a list or paginated results." });
 }
 
 export const api = {

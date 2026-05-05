@@ -13,17 +13,28 @@ export default function AuctionsPage() {
   const [lots, setLots] = useState<Lot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lotPreviewError, setLotPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       setError(null);
+      setLotPreviewError(null);
       try {
-        const [auctionData, lotData] = await Promise.all([api.getAuctions(), api.getLots()]);
+        const auctionData = await api.getAuctions();
         setAuctions(auctionData);
-        setLots(lotData);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Unable to load auctions.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const lotData = await api.getLots();
+        setLots(lotData);
+      } catch (err) {
+        setLots([]);
+        setLotPreviewError(err instanceof ApiError ? err.message : "Unable to load lot previews.");
       } finally {
         setIsLoading(false);
       }
@@ -60,7 +71,9 @@ export default function AuctionsPage() {
           <span className="eyebrow">Lots</span>
           <h2>Browse the floor</h2>
         </div>
-        {featuredLots.length === 0 ? (
+        {lotPreviewError ? (
+          <ErrorState message={lotPreviewError} />
+        ) : featuredLots.length === 0 ? (
           <EmptyState title="No lots visible" message="Open lots will appear here." />
         ) : (
           <div className="lot-grid">
@@ -73,4 +86,3 @@ export default function AuctionsPage() {
     </main>
   );
 }
-
