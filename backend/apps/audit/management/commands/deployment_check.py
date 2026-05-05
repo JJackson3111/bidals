@@ -9,6 +9,8 @@ from django.utils import timezone
 
 from apps.audit.models import AuditAction, AuditLog
 
+HEALTH_CHECK_PATH = "/api/health/"
+
 
 @dataclass(frozen=True)
 class DeploymentCheckResult:
@@ -142,10 +144,14 @@ def _check_migrations() -> DeploymentCheckResult:
 def _check_health_endpoint() -> DeploymentCheckResult:
     hosts = list(getattr(settings, "ALLOWED_HOSTS", []))
     http_host = "localhost" if not hosts or "*" in hosts else hosts[0]
-    response = Client().get("/api/health/", HTTP_HOST=http_host, HTTP_X_REQUEST_ID="deployment-check")
+    response = Client().get(HEALTH_CHECK_PATH, follow=True, HTTP_HOST=http_host, HTTP_X_REQUEST_ID="deployment-check")
     if response.status_code == 200 and response.headers.get("X-Request-ID"):
-        return DeploymentCheckResult("PASS", "HEALTH", "Backend health endpoint responds with a request id.")
-    return DeploymentCheckResult("FAIL", "HEALTH", f"Health endpoint returned status {response.status_code}.")
+        return DeploymentCheckResult(
+            "PASS",
+            "HEALTH",
+            f"Backend health endpoint {HEALTH_CHECK_PATH} responds with a request id.",
+        )
+    return DeploymentCheckResult("FAIL", "HEALTH", f"Health endpoint {HEALTH_CHECK_PATH} returned status {response.status_code}.")
 
 
 def _audit_deployment_check(*, checks: list[DeploymentCheckResult], production: bool) -> None:

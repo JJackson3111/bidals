@@ -10,6 +10,8 @@ from django.utils.dateparse import parse_datetime
 
 from apps.audit.models import AuditAction, AuditLog
 
+HEALTH_CHECK_PATH = "/api/health/"
+
 
 @dataclass(frozen=True)
 class ReadinessCheck:
@@ -199,10 +201,20 @@ def _allowed_hosts_check() -> ReadinessCheck:
 def _health_endpoint_check() -> ReadinessCheck:
     hosts = list(getattr(settings, "ALLOWED_HOSTS", []))
     http_host = "localhost" if not hosts or "*" in hosts else hosts[0]
-    response = Client().get("/api/health/", HTTP_HOST=http_host, HTTP_X_REQUEST_ID="release-check")
+    response = Client().get(HEALTH_CHECK_PATH, follow=True, HTTP_HOST=http_host, HTTP_X_REQUEST_ID="release-check")
     if response.status_code == 200 and response.headers.get("X-Request-ID"):
-        return ReadinessCheck("system", "Health endpoint", "PASS", "Backend health endpoint responds with a request id.")
-    return ReadinessCheck("system", "Health endpoint", "FAIL", f"Health endpoint returned status {response.status_code}.")
+        return ReadinessCheck(
+            "system",
+            "Health endpoint",
+            "PASS",
+            f"Backend health endpoint {HEALTH_CHECK_PATH} responds with a request id.",
+        )
+    return ReadinessCheck(
+        "system",
+        "Health endpoint",
+        "FAIL",
+        f"Health endpoint {HEALTH_CHECK_PATH} returned status {response.status_code}.",
+    )
 
 
 def _migrations_check() -> ReadinessCheck:

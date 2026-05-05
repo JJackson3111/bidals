@@ -17,6 +17,8 @@ def test_deployment_check_runs_locally_and_audits():
 
     rendered = output.getvalue()
     assert "[PASS]" in rendered
+    assert "[PASS] HEALTH" in rendered
+    assert "/api/health/" in rendered
     assert "Deployment check completed." in rendered
     assert AuditLog.objects.filter(action=AuditAction.DEPLOYMENT_CHECK_RUN).exists()
 

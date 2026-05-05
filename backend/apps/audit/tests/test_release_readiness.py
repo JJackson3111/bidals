@@ -65,6 +65,8 @@ def test_release_check_command_outputs_report_without_secrets(monkeypatch):
 
     rendered = output.getvalue()
     assert "Release readiness report generated" in rendered
+    assert "[PASS] system / Health endpoint" in rendered
+    assert "/api/health/" in rendered
     assert "system / SECRET_KEY" in rendered
     assert "release-check-test-secret" not in rendered
     assert AuditLog.objects.filter(action=AuditAction.RELEASE_CHECK_RUN).exists()
