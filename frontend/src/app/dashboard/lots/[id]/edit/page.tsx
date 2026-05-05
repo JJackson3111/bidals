@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ArrowDown, ArrowUp, Save, Trash2, Upload } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -13,7 +13,6 @@ import type { Bid, Lot, LotStatus, UpdateLotInput } from "@/lib/types";
 
 export default function EditLotPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const submitInFlightRef = useRef(false);
   const [lot, setLot] = useState<Lot | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
@@ -33,6 +32,16 @@ export default function EditLotPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  function uploadErrorMessage(err: unknown): string {
+    if (err instanceof ApiError) {
+      return err.message;
+    }
+    if (err instanceof Error) {
+      return err.message;
+    }
+    return "Image upload failed. The lot changes were saved.";
+  }
 
   useEffect(() => {
     async function load() {
@@ -80,7 +89,9 @@ export default function EditLotPage() {
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     if (query.get("imageUpload") === "failed") {
-      setImageError("Lot was created, but the image upload did not finish. Upload the image again here.");
+      setImageError(
+        query.get("message") || "Lot was created, but the image upload did not finish. Upload the image again here.",
+      );
     }
   }, []);
 
@@ -133,13 +144,23 @@ export default function EditLotPage() {
     try {
       const savedLot = await api.updateLot(lot.id, payload);
       if (imageFile) {
-        await api.uploadLotImage(savedLot.id, {
-          file: imageFile,
-          altText: imageAltText,
-        });
+        try {
+          await api.uploadLotImage(savedLot.id, {
+            file: imageFile,
+            altText: imageAltText,
+          });
+          setImageFile(null);
+          setImagePreviewUrl("");
+          setImageError(null);
+        } catch (uploadErr) {
+          setLot(savedLot);
+          setImageError(uploadErrorMessage(uploadErr));
+          setSuccess("Lot details were saved, but the image did not upload.");
+          return;
+        }
       }
-      setSuccess("Lot saved.");
-      router.push(`/lots/${savedLot.id}`);
+      await refreshLot();
+      setSuccess(imageFile ? "Lot saved and image uploaded." : "Lot saved.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to save lot.");
     } finally {

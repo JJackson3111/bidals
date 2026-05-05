@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from django.conf import settings
 from django.db import transaction
@@ -95,6 +96,30 @@ def _parse_datetime_query_param(value: str | None, field_name: str):
 def _ensure_can_manage_lot_images(*, user, lot: Lot) -> None:
     if not (user and user.is_authenticated and (user.is_platform_admin or lot.auction.created_by_id == user.id)):
         raise PermissionDenied("Only the auction owner or an admin can manage lot images.")
+
+
+def _ensure_local_media_root_available() -> None:
+    if settings.USE_S3:
+        return
+
+    try:
+        Path(settings.MEDIA_ROOT).mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.exception(
+            "Lot image media root is not writable",
+            extra={
+                "event": "lot_image_storage_unavailable",
+                "media_root": str(settings.MEDIA_ROOT),
+            },
+        )
+        raise ValidationError(
+            {
+                "image": [
+                    "Image storage is not available. Configure a writable MEDIA_ROOT for staging "
+                    "or enable object storage for production."
+                ]
+            }
+        ) from exc
 
 
 def _winner_review_queryset_for_user(user):
@@ -724,7 +749,28 @@ class LotViewSet(viewsets.ModelViewSet):
             },
         )
         serializer.is_valid(raise_exception=True)
-        lot_image = serializer.save(lot=lot)
+        _ensure_local_media_root_available()
+        try:
+            lot_image = serializer.save(lot=lot)
+        except OSError as exc:
+            logger.exception(
+                "Lot image upload failed while saving file",
+                extra={
+                    "event": "lot_image_upload_failed",
+                    "lot_id": lot.id,
+                    "auction_id": lot.auction_id,
+                    "actor_id": user.id,
+                    "media_root": str(settings.MEDIA_ROOT),
+                },
+            )
+            raise ValidationError(
+                {
+                    "image": [
+                        "Image upload failed because storage is unavailable. "
+                        "Check MEDIA_ROOT/SERVE_LOCAL_MEDIA for staging or object storage settings for production."
+                    ]
+                }
+            ) from exc
 
         AuditLog.objects.create(
             actor=user,

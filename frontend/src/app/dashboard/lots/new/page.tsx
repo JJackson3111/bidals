@@ -31,6 +31,16 @@ export default function NewLotPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function uploadErrorMessage(err: unknown): string {
+    if (err instanceof ApiError) {
+      return err.message;
+    }
+    if (err instanceof Error) {
+      return err.message;
+    }
+    return "Image upload failed.";
+  }
+
   useEffect(() => {
     async function load() {
       setIsLoading(true);
@@ -110,8 +120,9 @@ export default function NewLotPage() {
             file: imageFile,
             altText: imageAltText || title,
           });
-        } catch {
-          router.push(`/dashboard/lots/${lot.id}/edit?imageUpload=failed`);
+        } catch (uploadErr) {
+          const message = encodeURIComponent(uploadErrorMessage(uploadErr));
+          router.push(`/dashboard/lots/${lot.id}/edit?imageUpload=failed&message=${message}`);
           return;
         }
       }

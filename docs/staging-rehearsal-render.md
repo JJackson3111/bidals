@@ -363,7 +363,7 @@ Remaining readiness warnings:
 | Admin ops | Audit logs visible | PASS | Django admin Audit logs page loads and shows recent entries. |
 | Admin ops | Release check UI works | WARN | Admin Django access is confirmed; release-check UI/API still needs direct smoke evidence. |
 | Seller flow | Create lot single-submit protection | PASS in code / redeploy needed | Create/edit lot forms now use a synchronous in-flight guard plus disabled submit/loading state so rapid double-clicks cannot submit duplicate `POST /api/lots/` calls. |
-| Seller flow | Lot image upload foundation | PASS in code / redeploy needed | Backend `LotImage` upload/delete/reorder APIs already exist and remain seller/admin protected. Create/edit lot forms now show image previews and route to edit if post-create upload needs retry. Public lot cards/detail use uploaded image URLs when available. |
+| Seller flow | Lot image upload foundation | PASS in code / redeploy needed | Backend `LotImage` upload/delete/reorder APIs remain seller/admin protected. Upload requests use multipart `FormData` with JWT auth. The production Docker image now creates writable `/app/media`, upload storage failures return clear field errors, edit/create forms surface backend errors, and public lot cards/detail use uploaded image URLs when available. |
 | Seller flow | Auction-derived lot availability | PASS in code / redeploy needed | Backend rejects `status=open` for draft, ended, or cancelled auctions. Scheduled auctions may prepare open lots, but bidding remains rejected until server time and auction status are live. Frontend helper text now says lots only become bid-open when the auction is live. |
 
 ## Issues Found
@@ -379,13 +379,14 @@ Remaining readiness warnings:
 | High | Create lot form could create duplicate lots during demo flow. | Rapid repeat submit, or retry after a post-create image-upload failure, could send another lot create request. | FIXED IN CODE / PENDING REDEPLOY - frontend now has a synchronous in-flight submit guard, disabled submit state, and post-create image upload retry path that does not create another lot. |
 | Medium | Seller lot form could imply a draft auction lot was bid-open. | Create/edit lot form allowed selecting `open` without clearly deriving availability from auction status. | FIXED IN CODE / PENDING REDEPLOY - backend rejects open lots for draft/ended/cancelled auctions; frontend disables misleading open state and explains auction-live requirement. |
 | Medium | Lot image upload needed demo-readiness polish. | Seller create/edit flow had upload hooks but limited feedback/preview, and local media serving was not explicitly staging-controlled. | FIXED IN CODE / PENDING REDEPLOY - image previews added, upload retry path improved, local media serving controlled by `SERVE_LOCAL_MEDIA`, and production object storage remains required. |
+| High | Edit lot image upload showed generic `Request failed`. | Save a lot from `/dashboard/lots/{id}/edit` with an uploaded image while staging local media storage is unavailable or unwritable. | FIXED IN CODE / PENDING REDEPLOY - `backend/Dockerfile` now creates writable `/app/media`, backend validates local storage availability before saving files, API errors name the image storage problem, and the edit form keeps the page usable while showing the backend error. |
 
 ## Remaining Phase 17 Manual Checks
 
 - Optional: inspect Render backend logs for previous `POST /api/lots/{id}/bid/` 500s and confirm no new cache/Redis exceptions after commit `cb9ca78`.
 - Provision/configure managed Redis for production throttling: set `REDIS_URL`, `USE_REDIS_CACHE=True`, and verify Redis connectivity. Current staging evidence warns Redis is disabled.
 - Configure object storage for production media uploads. Current staging evidence warns local media storage is configured.
-- For staging-only image demos without S3/R2, set `SERVE_LOCAL_MEDIA=True` with `USE_S3=False`; keep `SERVE_LOCAL_MEDIA=False` in production.
+- For staging-only image demos without S3/R2, set `SERVE_LOCAL_MEDIA=True` with `USE_S3=False`; keep `SERVE_LOCAL_MEDIA=False` in production. After redeploy, verify `/app/media` is writable by uploading from `/dashboard/lots/{id}/edit`.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
 - Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery.
 - Capture successful scheduler logs and confirm related audit/operations visibility.

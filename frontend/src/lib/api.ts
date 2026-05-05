@@ -73,10 +73,11 @@ async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
-  const body = isJson ? await response.json() : null;
+  const body = isJson ? await response.json().catch(() => null) : null;
+  const textBody = !isJson ? await response.text().catch(() => "") : "";
 
   if (!response.ok) {
-    const message = extractErrorMessage(body) || response.statusText || "Request failed";
+    const message = extractErrorMessage(body) || textBody.trim() || response.statusText || `Request failed with ${response.status}`;
     throw new ApiError(message, response.status, body ?? {});
   }
 

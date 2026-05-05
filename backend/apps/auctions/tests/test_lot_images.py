@@ -93,6 +93,27 @@ def test_bidder_cannot_upload_lot_image():
     assert not LotImage.objects.filter(lot=lot).exists()
 
 
+def test_upload_returns_clear_error_when_local_media_is_unavailable(monkeypatch):
+    seller, lot = create_lot()
+    client = APIClient()
+    client.force_authenticate(user=seller)
+
+    def blocked_mkdir(self, *args, **kwargs):
+        raise OSError("media root is not writable")
+
+    monkeypatch.setattr("apps.auctions.views.Path.mkdir", blocked_mkdir)
+
+    response = client.post(
+        f"/api/lots/{lot.id}/images/",
+        {"image": upload_file(), "alt_text": "Blocked storage"},
+        format="multipart",
+    )
+
+    assert response.status_code == 400
+    assert "Image storage is not available" in str(response.data["image"])
+    assert not LotImage.objects.filter(lot=lot).exists()
+
+
 @override_settings(MEDIA_ROOT="/tmp/bidals-test-media")
 def test_public_lot_detail_includes_uploaded_image_urls():
     seller, lot = create_lot()

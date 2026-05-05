@@ -39,6 +39,8 @@ RUN DJANGO_SETTINGS_MODULE=bidals.settings.prod \
     DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000 \
     python manage.py collectstatic --noinput
 
+RUN mkdir -p /app/media && chown -R app:app /app/media
+
 EXPOSE 8000
 
 USER app
