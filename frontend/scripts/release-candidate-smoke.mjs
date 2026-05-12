@@ -395,7 +395,7 @@ async function main() {
   });
 
   await check("Audit log created", async () => {
-    const logs = unwrapList(await adminApi.json(`/audit/?entity_type=lot&entity_id=${state.lot.id}`));
+    const logs = unwrapList(await adminApi.json(`/lots/${state.lot.id}/audit/`));
     const actions = new Set(logs.map((log) => log.action));
     if (!actions.has("bid_accepted") || !actions.has("bid_rejected")) {
       throw new Error(`Expected bid_accepted and bid_rejected audit logs; got ${[...actions].join(", ")}`);
