@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:ci": "playwright test --project=chromium --reporter=line",
+    "smoke:release-candidate": "node scripts/release-candidate-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

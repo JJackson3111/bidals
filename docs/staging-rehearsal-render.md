@@ -2,7 +2,7 @@
 
 Provider selected: Render
 
-Status: PARTIAL - staging core is healthy. Backend and frontend staging services are deployed, health/browse/auth/create/bidding flows have live evidence, the Browse empty-state issue is fixed, the bid endpoint `500` regression is fixed and verified after backend redeploy commit `cb9ca78`, and Render shell readiness checks now pass health, migrations, Redis cache, object storage, and audit-related checks. Production readiness still requires scheduler jobs, backup restore evidence, and final admin workflow checks.
+Status: STAGING CORE PASS - backend and frontend staging services are deployed, health/browse/auth/create/bidding flows have live evidence, the Browse empty-state issue is fixed, the bid endpoint `500` regression is fixed and verified after backend redeploy commit `cb9ca78`, Render shell readiness checks pass health, migrations, Redis cache, object storage, and audit-related checks, and all Render cron jobs now execute through the hardened scheduled-job runner. Production readiness still requires backup/restore evidence and final business-workflow smoke checks for winner outcomes, fulfillment, notifications, admin export, and repair lifecycle.
 
 This document is the Phase 17 execution record. Fill in the evidence sections during the live Render staging rehearsal. Do not record secrets, tokens, database passwords, or private keys here.
 
@@ -74,9 +74,10 @@ Confirmed staging evidence so far:
 | Frontend browse route | PASS | `GET https://bidals-1.onrender.com/auctions` returns `200 OK`; operator confirmed Browse now shows empty states for no auctions/lots. |
 | Frontend browse empty state | PASS | Browse page no longer treats a valid empty DRF paginated response as an error. |
 | Bid endpoint after `cb9ca78` redeploy | PASS | Fresh smoke lot id `4`: valid bid `15.00` returned `201 accepted`, invalid bid `16.00` returned `409 INVALID_INCREMENT`, anonymous bid `20.00` returned `401 UNAUTHENTICATED`, and `current_price` moved only from `10.00` to `15.00`. |
-| Render `release_check` | PASS/WARN | Render shell check now passes health endpoint, migrations, audit logs, and admin export installation/protection. Remaining WARN items are backup, scheduled jobs, fulfillment, repair workflow, and notification unread count. |
+| Render `release_check` | PASS/WARN | Render shell check passes health endpoint, migrations, audit logs, and admin export installation/protection. Scheduler execution is now independently verified; rerun `release_check` after setting `SCHEDULED_JOBS_CONFIGURED=True` to clear the earlier scheduled-jobs WARN. Remaining true WARN items are backup/restore and final fulfillment, repair, and notification smoke checks. |
 | Render `deployment_check --production` | PASS | Render shell check now passes DEBUG, SECRET_KEY, ALLOWED_HOSTS, DATABASE, REDIS, MEDIA_STORAGE, EMAIL disabled safely, MIGRATIONS, and HEALTH. |
 | Django admin access | PASS | `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. Django admin shows Users, Auctions, Bids, Fulfillment records, Lots, Audit logs, Outbound notifications, Outcome repair requests/comments, and token blacklist models. |
+| Render scheduled jobs | PASS | `close_expired_auctions`, `monitor_bid_anomalies --window-minutes 60`, and `deliver_notifications` now execute successfully through `sh /app/scripts/run_scheduled_job.sh ...`. Confirmed diagnostics include `settings_module=bidals.settings.prod`, `database_engine=django.db.backends.postgresql`, `required_env=pass`, `redis_env=pass`, and `s3_env=pass`. Notification delivery completed successfully. |
 
 ## Staging Environment Variables
 
@@ -109,7 +110,7 @@ Backend:
 - `BID_RATE_LIMIT_WINDOW_SECONDS=60`
 - `BID_ANOMALY_REJECT_THRESHOLD=5`
 - `BID_ANOMALY_RATE_LIMIT_THRESHOLD=3`
-- `SCHEDULED_JOBS_CONFIGURED=True` after schedulers are configured
+- `SCHEDULED_JOBS_CONFIGURED=True` after schedulers are configured and verified
 - `EMAIL_NOTIFICATIONS_ENABLED=False` unless staging email is deliberately configured
 - `DEFAULT_FROM_EMAIL=<staging sender if email enabled>`
 - `MEDIA_URL=/media/`
@@ -170,25 +171,17 @@ The runner validates required vars before `django.setup()`. If several required 
 
 | Job | Command | Suggested frequency | Result |
 | --- | --- | --- | --- |
-| Auction closing and winner calculation | `sh /app/scripts/run_scheduled_job.sh close_expired_auctions` | Every 1 minute, or the shortest Render-supported interval | PASS for one-off/manual run; cron evidence still needed |
-| Bid anomaly monitoring | `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60` | Every 5 minutes | OPEN - use absolute wrapper path to prevent file-not-found and SQLite/dev fallback |
-| Notification delivery | `sh /app/scripts/run_scheduled_job.sh deliver_notifications` | Every 5 minutes if email enabled | OPEN - use absolute wrapper path to prevent file-not-found and SQLite/dev fallback |
+| Auction closing and winner calculation | `sh /app/scripts/run_scheduled_job.sh close_expired_auctions` | Every 1 minute, or the shortest Render-supported interval | PASS - Render cron executes through the hardened runner with production settings and PostgreSQL |
+| Bid anomaly monitoring | `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60` | Every 5 minutes | PASS - Render cron executes through the hardened runner with production settings and PostgreSQL |
+| Notification delivery | `sh /app/scripts/run_scheduled_job.sh deliver_notifications` | Every 5 minutes if email enabled | PASS - Render cron executes through the hardened runner; notification delivery run completed successfully |
 
 Evidence to capture:
 
-- Render scheduler name:
-- Last run timestamp:
-- Log excerpt showing success:
-- Expected safe diagnostics:
-  - `scheduled_job=<job_name>`
-  - `settings_module=bidals.settings.prod`
-  - `required_env=pass`
-  - `redis_env=pass` or `redis_env=not_enabled`
-  - `s3_env=pass` or `s3_env=not_enabled`
-  - `email_env=pass` or `email_env=not_enabled`
-  - `database_engine=django.db.backends.postgresql`
-  - `use_redis_cache=True`
-- Audit log event visible in `/dashboard/operations`:
+- Render scheduler name: configured in Render Cron Jobs for auction closing, anomaly monitoring, and notification delivery.
+- Last run timestamp: available in Render cron logs.
+- Log excerpt showing success: confirmed safe diagnostics include `settings_module=bidals.settings.prod`, `database_engine=django.db.backends.postgresql`, `required_env=pass`, `redis_env=pass`, and `s3_env=pass`.
+- Notification delivery evidence: delivery run completed successfully.
+- Audit log event visible in `/dashboard/operations`: still useful to verify during the next admin operations smoke pass.
 
 If Render cannot find the runner, temporarily set the cron command to:
 
@@ -313,12 +306,18 @@ Confirmed PASS checks:
 [PASS] ops / Audit logs
 [PASS] ops / Admin export
 
-Remaining WARN checks:
+Remaining WARN checks from the earlier shell run:
 [WARN] database / Backup verification
 [WARN] ops / Scheduled jobs
 [WARN] core_flows / Fulfillment workflow
 [WARN] notifications / Unread count
 [WARN] ops / Repair workflow
+
+Follow-up scheduler evidence:
+[PASS] ops / Scheduled jobs: Render cron jobs now execute through the hardened runner with `settings_module=bidals.settings.prod`, `database_engine=django.db.backends.postgresql`, `required_env=pass`, `redis_env=pass`, and `s3_env=pass`.
+
+Next release-check action:
+Set `SCHEDULED_JOBS_CONFIGURED=True` in the backend environment and rerun `python manage.py release_check` to replace the earlier scheduled-jobs WARN with PASS in command output.
 ```
 
 Admin access probe:
@@ -387,7 +386,7 @@ Remaining readiness warnings:
 - Backup verification remains WARN until `BACKUP_LAST_VERIFIED_AT` is configured from real provider evidence.
 - Restore verification remains WARN until `BACKUP_LAST_RESTORE_TEST_AT` is configured after a non-production restore rehearsal.
 - Render free PostgreSQL still limits managed backup/restore proof; use a supported plan/provider path or a manual `pg_dump`/restore rehearsal.
-- Scheduled jobs still need Render cron execution evidence and `SCHEDULED_JOBS_CONFIGURED=true` only after that evidence exists.
+- Scheduled jobs now have Render execution evidence through the hardened runner. Set `SCHEDULED_JOBS_CONFIGURED=True` once the staging/prod env reflects this configuration.
 - Redis is now configured and verified in Render staging; bid throttling uses the shared cache path.
 - Media storage now reports object storage enabled in Render staging; uploaded lot images are no longer dependent on Render local filesystem storage.
 - Admin smoke checks now confirm audit logs, fulfillment records, outbound notifications, and repair workflow Django admin pages load. Frontend/admin export CSV and notification mark-read still need live smoke evidence.
@@ -408,8 +407,9 @@ Remaining readiness warnings:
 | Bidding | Invalid bid rejected by backend | PASS | Fresh `POST /api/lots/4/bid/` with bidder token and amount `16.00` returned controlled `409` response with `{"status":"rejected","reason":"INVALID_INCREMENT","current_price":"15.00"}`. Redis reconnect smoke rerun on lot id `9` returned controlled `409 INVALID_INCREMENT`, bid id `7`, current price still `15.00`; anonymous bid amount `20.00` returned controlled `401 UNAUTHENTICATED`. |
 | Bidding | Failed bid attempts do not corrupt lot state | PASS | Lot id `4` current price was `10.00` before bidding, `15.00` after the valid bid, and stayed `15.00` after both invalid and anonymous rejected attempts. Redis reconnect smoke rerun lot id `9` followed the same pattern: `10.00` before bid, `15.00` after accepted bid, and still `15.00` after rejected/anonymous attempts. |
 | Bidding | Bid history correct | PASS | Public `GET /api/lots/4/bids/` returned one accepted bid id `3`. Seller-authenticated `GET /api/lots/4/bids/` returned rejected bid id `4` (`INVALID_INCREMENT`) plus accepted bid id `3`. Redis reconnect smoke rerun lot id `9`: public bid history returned accepted bid id `6`; seller bid history returned rejected bid id `7` (`INVALID_INCREMENT`) plus accepted bid id `6`. |
-| Lifecycle | Scheduler closes ended auction | WARN | Render cron/job setup evidence has not been provided. Bid endpoint is now verified; closing/winner calculation still requires scheduler execution evidence. |
-| Lifecycle | Winner calculated from accepted bids only | WARN | Not verified; depends on `close_expired_auctions` execution against a lot with accepted bids. |
+| Lifecycle | Scheduler jobs execute with production settings | PASS | Render cron jobs now run through `sh /app/scripts/run_scheduled_job.sh ...` and show `settings_module=bidals.settings.prod`, `database_engine=django.db.backends.postgresql`, `required_env=pass`, `redis_env=pass`, and `s3_env=pass`. |
+| Lifecycle | Scheduler closes ended auction | WARN | Cron execution is verified. A targeted ended-auction smoke with accepted bids should still prove the job creates the expected winner/outcome data in staging. |
+| Lifecycle | Winner calculated from accepted bids only | WARN | Not yet evidenced with an ended lot containing accepted bids; verify with a targeted auction lifecycle smoke. |
 | Fulfillment | Seller sees fulfillment dashboard | PASS | Seller `GET /api/dashboard/fulfillment/` returned `200 OK` with empty summary/results. End-to-end fulfillment still needs a calculated winner. |
 | Fulfillment | Seller updates fulfillment status | WARN | Not verified because no winner/fulfillment record exists yet. |
 | Fulfillment | Bidder sees won lots | WARN | Not verified because no winning bid/winner outcome exists yet. |
@@ -442,8 +442,8 @@ Remaining readiness warnings:
 | Critical | Staging bid endpoint returned `500` for authenticated valid bid, authenticated invalid bid, and anonymous bid probe. | Original failure reproduced on lot id `2`. After redeploy commit `cb9ca78`, fresh lot id `4` was tested with valid, invalid, and anonymous bid attempts. | FIXED AND VERIFIED - valid bid now returns `201 accepted`, invalid increment returns controlled `409 INVALID_INCREMENT`, anonymous bid returns controlled `401 UNAUTHENTICATED`, and lot state remains authoritative. |
 | Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-1.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
 | High | Documented staging admin credentials were not available. | Earlier `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`; staging admin setup was then repaired. | FIXED AND VERIFIED - `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. |
-| High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | OPEN - `close_expired_auctions` worked after path/env fixes, but `monitor_bid_anomalies` still hit SQLite/dev fallback. Scheduled jobs now must use `sh /app/scripts/run_scheduled_job.sh ...`; scheduler logs and restore proof remain. |
-| High | Render cron jobs can fall back to SQLite/dev settings when run as raw inline commands. | `python manage.py monitor_bid_anomalies --window-minutes 60` in Render cron failed with `django.db.utils.OperationalError: unable to open database file`. A later relative wrapper command failed with `sh: 0: cannot open scripts/run_scheduled_job.sh: No such file`. | FIXED IN CODE / PENDING REDEPLOY - use `sh /app/scripts/run_scheduled_job.sh ...` for all scheduled jobs. The Docker build now verifies the runner exists at `/app/scripts/run_scheduled_job.sh` and creates `/usr/local/bin/bidals-scheduled-job`. The wrapper requires `bidals.settings.prod`, validates `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, and `DATABASE_URL` or `DJANGO_DATABASE_URL` before importing Django, changes into the backend directory, and prints safe diagnostics before execution. |
+| High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | PARTIALLY RESOLVED - scheduler execution is now verified for all cron jobs through the hardened runner; backup/restore proof remains open. |
+| High | Render cron jobs can fall back to SQLite/dev settings when run as raw inline commands. | `python manage.py monitor_bid_anomalies --window-minutes 60` in Render cron failed with `django.db.utils.OperationalError: unable to open database file`. A later relative wrapper command failed with `sh: 0: cannot open scripts/run_scheduled_job.sh: No such file`. | FIXED AND VERIFIED - all cron jobs now use `sh /app/scripts/run_scheduled_job.sh ...` and show production settings plus PostgreSQL diagnostics. |
 | Medium | Managed backup restore cannot be fully verified on current free Render Postgres setup. | Try to provide provider-managed backup/restore evidence from free staging database. | OPEN/WARN - use supported Render plan/provider restore path or manual non-production `pg_dump` restore rehearsal. |
 | Medium | `release_check` and `deployment_check --production` failed in Render shell because the health probe hit `/api/health` and received Django's trailing-slash `301` redirect. | Run `python manage.py release_check` or `python manage.py deployment_check --production` in Render shell before the readiness health-path fix. | FIXED AND VERIFIED - Render shell checks now pass the health endpoint after switching readiness checks to `/api/health/` with redirect-safe behavior. |
 | High | Create lot form could create duplicate lots during demo flow. | Rapid repeat submit, or retry after a post-create image-upload failure, could send another lot create request. | FIXED IN CODE / PENDING REDEPLOY - frontend now has a synchronous in-flight submit guard, disabled submit state, and post-create image upload retry path that does not create another lot. |
@@ -457,17 +457,56 @@ Remaining readiness warnings:
 - Continue monitoring Redis-backed bid throttling during live smoke tests; Redis is now configured and verified by `deployment_check --production`.
 - Continue using object storage for persistent media; `deployment_check --production` now reports MEDIA_STORAGE pass. Optional follow-up: upload a lot image, redeploy/restart Render, and confirm the image still loads from object storage.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
-- Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery using `sh /app/scripts/run_scheduled_job.sh ...`.
-- Capture successful scheduler logs showing `settings_module=bidals.settings.prod` and `database_engine=django.db.backends.postgresql`; confirm related audit/operations visibility.
 - Create or identify a managed PostgreSQL backup, or document the free Render Postgres limitation and run a non-production manual restore rehearsal when possible.
 - Restore the backup/dump into staging or a restore-test database.
 - Re-run `python manage.py verify_backup` after recording backup metadata.
-- Re-run `python manage.py release_check` after scheduler, backup, fulfillment, notification, and repair workflow checks are complete.
+- Re-run `python manage.py release_check` after backup, fulfillment, notification, and repair workflow checks are complete.
 - After redeploy, re-test seller create lot: one click creates exactly one lot, the submit button disables while saving, image upload/preview works, and draft auctions cannot create truly bid-open lots.
-- Execute remaining smoke checks: admin export CSV download, scheduler close/winner calculation, fulfillment update, won-lots page, notification mark-read, repair request create/approve/apply if practical, and release-check UI.
+- Execute remaining smoke checks: admin export CSV download, targeted close/winner calculation with accepted bids, fulfillment update, won-lots page, notification mark-read, repair request create/approve/apply if practical, and release-check UI.
+
+## Production Go/No-Go
+
+Must-have before production:
+
+- Release candidate smoke: run `npm run smoke:release-candidate` against the deployed staging URLs and attach the PASS/WARN/FAIL report to this rehearsal record. See [`release-candidate-smoke.md`](release-candidate-smoke.md).
+- Backup/restore proof: complete a non-production restore rehearsal or move staging to a provider/plan where restore evidence can be captured, then set `BACKUP_LAST_VERIFIED_AT` and `BACKUP_LAST_RESTORE_TEST_AT`.
+- Auction lifecycle smoke: run a targeted ended-auction test with accepted bids and confirm `close_expired_auctions` creates winner/outcome data from accepted backend bids only.
+- Fulfillment smoke: confirm seller/admin can update a fulfillment record and the bidder won-lots view reflects backend-owned fulfillment state.
+- Notification smoke: create a real notification, confirm unread count increments, and confirm mark-read behavior.
+- Admin governance smoke: verify admin export CSV download and repair request create/approve/apply flow with two admins if production will expose the repair workflow.
+- Seller flow redeploy verification: confirm the latest create-lot duplicate-submit, image upload, and auction-derived lot availability fixes are deployed and tested in staging.
+
+Nice-to-have operational improvements:
+
+- Add exact Render cron job names and last-run timestamps to this document.
+- Add the release candidate smoke suite to CI or a manual release checklist once staging credentials are available in a secure secret store.
+- Add dashboard evidence screenshots for operations, fulfillment, notifications, and repair pages.
+- Add provider-managed backup screenshots or links to provider runbook entries once the database plan supports them.
+- Enable staging Sentry DSN for non-secret exception capture before production cutover.
+
+## Release Candidate Smoke Gate
+
+Run this before production approval:
+
+```bash
+cd frontend
+npm run smoke:release-candidate
+```
+
+Required environment variables are documented in [`release-candidate-smoke.md`](release-candidate-smoke.md). The gate is API-level and validates backend-owned state against deployed staging URLs. It does not trigger frontend-side bid validation or script-side winner calculation.
+
+Attach the generated `PASS/WARN/FAIL` summary here after the first run:
+
+```text
+Release candidate smoke summary:
+PASS=
+WARN=
+FAIL=
+Notes:
+```
 
 ## Final Readiness Assessment
 
-Status: NOT READY FOR PRODUCTION FROM PHASE 17 YET
+Status: STAGING CORE PASS / PRODUCTION GO-NO-GO PENDING
 
-Reason: Staging core is healthy: backend/frontend health, auth, auction/lot creation, browse, bidding, migrations, Redis-backed cache readiness, object-storage readiness, audit log readability, Django admin login, audit log visibility, fulfillment/notification/repair admin page access, and admin export installation/protection have live Render evidence. Bidding smoke passes with server-authoritative accepted/rejected responses and safe lot state. Production is still blocked on scheduled job execution proof, backup restore evidence, admin export CSV verification, and final workflow checks for fulfillment updates, notification mark-read, repair request lifecycle, and release-check UI.
+Reason: Staging core is healthy: backend/frontend health, auth, auction/lot creation, browse, bidding, migrations, Redis-backed cache readiness, object-storage readiness, scheduled job execution, audit log readability, Django admin login, audit log visibility, fulfillment/notification/repair admin page access, and admin export installation/protection have live Render evidence. Bidding smoke passes with server-authoritative accepted/rejected responses and safe lot state. Production go/no-go is still pending backup/restore evidence and final business-workflow smoke checks for winner outcome creation, fulfillment updates, notification mark-read, admin export CSV, repair lifecycle, release-check UI, and latest seller-flow fixes after redeploy.

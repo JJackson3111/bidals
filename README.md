@@ -146,7 +146,7 @@ BIDALS is a secure, cloud-ready digital auction platform. The backend is designe
 
 Phase 17 is a real cloud validation phase, not a feature phase. The selected staging provider is Render. The execution record lives in [`docs/staging-rehearsal-render.md`](docs/staging-rehearsal-render.md).
 
-Current rehearsal status: blocked until Render access, staging service URLs, managed PostgreSQL/Redis resources, and staging secrets are available to the operator. Do not mark Phase 17 complete until the external deployment, scheduler runs, managed PostgreSQL restore, staging `release_check`, and full smoke checklist have real evidence.
+Current rehearsal status: staging core is operationally healthy on Render. Backend/frontend health, auth, auction/lot creation, browsing, bidding, Redis-backed throttling, S3/R2 object storage, admin access, and scheduled jobs have live evidence. Production go/no-go still depends on backup/restore proof and the release candidate smoke suite.
 
 Phase 17 evidence must include:
 
@@ -156,6 +156,15 @@ Phase 17 evidence must include:
 - Sanitized `python manage.py release_check` output.
 - PASS/WARN/FAIL smoke checklist results against live staging URLs.
 - Any issues found, fixes applied, and final production-readiness recommendation.
+
+Release candidate gate:
+
+```bash
+cd frontend
+npm run smoke:release-candidate
+```
+
+See [`docs/release-candidate-smoke.md`](docs/release-candidate-smoke.md) for required environment variables and the PASS/WARN/FAIL report format.
 
 ## Phase Plan
 
@@ -1356,6 +1365,34 @@ The suite covers:
 - admin audit log visibility
 
 GitHub Actions includes an `e2e` job that starts PostgreSQL and Redis services, migrates the backend, seeds demo data, starts Django, installs Playwright Chromium, and runs `npm run test:e2e:ci`. On failure, it uploads the Playwright report artifact when available.
+
+## Release Candidate Smoke Suite
+
+Use this suite before production releases to validate the full backend-owned auction lifecycle against deployed staging URLs.
+
+```bash
+cd frontend
+RC_SMOKE_API_BASE_URL=https://bidals.onrender.com/api \
+RC_SMOKE_FRONTEND_URL=https://bidals-1.onrender.com \
+RC_SMOKE_SELLER_USERNAME=<seller> \
+RC_SMOKE_SELLER_PASSWORD=<seller-password> \
+RC_SMOKE_BIDDER_USERNAME=<bidder> \
+RC_SMOKE_BIDDER_PASSWORD=<bidder-password> \
+RC_SMOKE_ADMIN_USERNAME=<admin> \
+RC_SMOKE_ADMIN_PASSWORD=<admin-password> \
+npm run smoke:release-candidate
+```
+
+For the full two-admin repair smoke, also set:
+
+```bash
+RC_SMOKE_ADMIN2_USERNAME=<second-admin>
+RC_SMOKE_ADMIN2_PASSWORD=<second-admin-password>
+```
+
+The runner creates uniquely named `[RC SMOKE]` staging records, waits for the deployed cron-backed auction close path, and reports `PASS`, `WARN`, and `FAIL`. It validates seller/bidder/admin login, auction and lot creation, optional image upload, accepted and rejected bid responses, bid history, audit logs, admin CSV export, winner outcome calculation, fulfillment, won-lots, notifications, mark-read, and repair workflow access. Full repair request/approve/apply runs when second-admin credentials are configured.
+
+The runner does not calculate winners, bypass bid rules, alter historical bids, or use frontend state as authority. Details live in [`docs/release-candidate-smoke.md`](docs/release-candidate-smoke.md).
 
 ## Dashboard Filtering
 
