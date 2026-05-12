@@ -1,5 +1,5 @@
 from .base import *  # noqa: F403
-from .base import REDIS_URL, env
+from .base import REDIS_CACHE_KEY_PREFIX, REDIS_CACHE_OPTIONS, REDIS_URL, env
 
 DEBUG = False
 SECRET_KEY = env("DJANGO_SECRET_KEY")
@@ -33,5 +33,7 @@ if USE_REDIS_CACHE:
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
+            "KEY_PREFIX": REDIS_CACHE_KEY_PREFIX,
+            "OPTIONS": REDIS_CACHE_OPTIONS,
         }
     }

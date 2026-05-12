@@ -193,12 +193,21 @@ CSRF_TRUSTED_ORIGINS = env.list(
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 USE_REDIS_CACHE = env.bool("USE_REDIS_CACHE", default=False)
+REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS = env.float("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", default=2.0)
+REDIS_SOCKET_TIMEOUT_SECONDS = env.float("REDIS_SOCKET_TIMEOUT_SECONDS", default=2.0)
+REDIS_CACHE_KEY_PREFIX = env("REDIS_CACHE_KEY_PREFIX", default="bidals")
+REDIS_CACHE_OPTIONS = {
+    "socket_connect_timeout": REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
+    "socket_timeout": REDIS_SOCKET_TIMEOUT_SECONDS,
+}
 
 if USE_REDIS_CACHE:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": REDIS_URL,
+            "KEY_PREFIX": REDIS_CACHE_KEY_PREFIX,
+            "OPTIONS": REDIS_CACHE_OPTIONS,
         }
     }
 else:

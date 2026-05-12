@@ -873,8 +873,11 @@ Backend:
 - `DJANGO_SECURE_HSTS_SECONDS`: use `31536000` after HTTPS is confirmed.
 - `DATABASE_URL`: managed PostgreSQL URL.
 - `DATABASE_CONN_MAX_AGE`: persistent DB connection age, default `60`.
-- `REDIS_URL`: managed Redis URL when Redis-backed features are enabled.
-- `USE_REDIS_CACHE`: set `True` in production so bid throttling uses shared Redis.
+- `REDIS_URL`: managed Redis URL when Redis-backed features are enabled. Render Redis may provide a `rediss://...` URL; keep the exact provider URL in backend secrets.
+- `USE_REDIS_CACHE`: set `True` in production/staging rehearsal so bid throttling uses shared Redis.
+- `REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS`: Redis connection timeout, default `2`.
+- `REDIS_SOCKET_TIMEOUT_SECONDS`: Redis socket timeout, default `2`.
+- `REDIS_CACHE_KEY_PREFIX`: cache key prefix, default `bidals`.
 - `FRONTEND_URL`: deployed frontend origin.
 - `LOG_LEVEL`: backend log level, usually `INFO` in production.
 - `ENABLE_STRUCTURED_LOGGING`: set `True` for JSON logs suitable for cloud log drains.
@@ -1016,13 +1019,39 @@ Recommended cadence: every 5 minutes when `EMAIL_NOTIFICATIONS_ENABLED=True`. If
 
 Use GitHub as the source for the backend image. Add Render Cron Jobs or background worker jobs that run against the same backend image and environment as the web service.
 
+Use the scheduled-job wrapper instead of inline `python manage.py ...` commands. The wrapper changes into the backend directory, forces `DJANGO_SETTINGS_MODULE=bidals.settings.prod`, maps `DJANGO_DATABASE_URL` to `DATABASE_URL` when needed, verifies a database URL exists, and prints only safe diagnostics before running the command.
+
+Render cron service settings:
+
+- Root Directory: leave blank/unset
+- Runtime: Docker
+- Dockerfile Path: `backend/Dockerfile`
+- Docker Build Context Directory: `backend`
+- Environment: same backend staging/production env vars as the web service
+
+Required env vars:
+
+- `DJANGO_SETTINGS_MODULE=bidals.settings.prod`
+- `DATABASE_URL=<managed PostgreSQL URL>` or `DJANGO_DATABASE_URL=<managed PostgreSQL URL>`
+- `DJANGO_SECRET_KEY=<secret>`
+- `DJANGO_ALLOWED_HOSTS=<backend host>`
+- `USE_REDIS_CACHE=True`
+- `REDIS_URL=<managed Redis URL>`
+- `FRONTEND_URL=<frontend origin>`
+
 Commands:
+
+- Auction closer: `./scripts/run_scheduled_job.sh close_expired_auctions`
+- Anomaly monitor: `./scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
+- Notification delivery: `./scripts/run_scheduled_job.sh deliver_notifications`
+
+The older raw commands below are safe for local/manual runs from inside the backend directory, but should not be used as Render cron commands:
 
 - Auction closer: `python manage.py close_expired_auctions`
 - Anomaly monitor: `python manage.py monitor_bid_anomalies --window-minutes 60`
 - Notification delivery: `python manage.py deliver_notifications`
 
-The jobs need the same `DATABASE_URL`, Redis/cache settings, email env vars if delivery is enabled, `ALERT_WEBHOOK_URL` if alert hooks are enabled, and Django settings as the backend web service. Configure logs to go to the same log stream as the web service.
+The jobs need the same `DATABASE_URL`, Redis/cache settings, email env vars if delivery is enabled, `ALERT_WEBHOOK_URL` if alert hooks are enabled, and Django settings as the backend web service. Configure logs to go to the same log stream as the web service. Do not put secrets inline in the command field.
 
 ### Railway Scheduled Workers
 
@@ -1503,7 +1532,7 @@ If auction closing or winner calculation fails:
 - Live updates use refresh/polling. WebSockets are intentionally deferred.
 - The operations dashboard is intentionally lightweight; full analytics, alert routing, and notification delivery are deferred.
 - Auction ending uses management commands suitable for cron/provider schedulers; Celery Beat is still deferred.
-- Rate limiting uses Django cache; production should set `USE_REDIS_CACHE=True` so all instances share Redis-backed counters.
+- Rate limiting uses Django cache; production should set `USE_REDIS_CACHE=True` so all instances share Redis-backed counters. `deployment_check --production` performs a Redis cache round-trip and fails if Redis is enabled but unreachable.
 - Fulfillment does not include payments, invoices, shipping labels, buyer/seller messaging, or courier integrations.
 - The backfill command does not include force-recalculation; already-finalized disputed outcomes need manual admin review.
 - Outcome repair approval requires a second admin, but applying an approved repair does not yet require a third distinct admin.

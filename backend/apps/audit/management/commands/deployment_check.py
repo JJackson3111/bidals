@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -102,9 +103,22 @@ def _check_database(*, production: bool) -> DeploymentCheckResult:
 
 def _check_redis(*, production: bool) -> DeploymentCheckResult:
     if getattr(settings, "USE_REDIS_CACHE", False):
-        if getattr(settings, "REDIS_URL", ""):
-            return DeploymentCheckResult("PASS", "REDIS", "Redis cache is enabled.")
-        return DeploymentCheckResult("FAIL", "REDIS", "Redis cache is enabled but REDIS_URL is missing.")
+        if not getattr(settings, "REDIS_URL", ""):
+            return DeploymentCheckResult("FAIL", "REDIS", "Redis cache is enabled but REDIS_URL is missing.")
+        try:
+            key = f"deployment-check:{timezone.now().timestamp()}"
+            cache.set(key, "ok", timeout=30)
+            value = cache.get(key)
+            cache.delete(key)
+        except Exception as exc:
+            return DeploymentCheckResult(
+                "FAIL",
+                "REDIS",
+                f"Redis cache is enabled but connectivity failed: {exc.__class__.__name__}.",
+            )
+        if value != "ok":
+            return DeploymentCheckResult("FAIL", "REDIS", "Redis cache round-trip returned an unexpected value.")
+        return DeploymentCheckResult("PASS", "REDIS", "Redis cache is enabled and reachable.")
     status = "WARN" if production else "PASS"
     return DeploymentCheckResult(status, "REDIS", "Redis cache is disabled; production throttling should use Redis.")
 

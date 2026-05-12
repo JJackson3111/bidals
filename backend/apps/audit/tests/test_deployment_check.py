@@ -4,6 +4,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
+from unittest.mock import patch
 
 from apps.audit.models import AuditAction, AuditLog
 
@@ -41,3 +42,39 @@ def test_deployment_check_production_mode_fails_without_printing_secrets():
     assert "[FAIL] DEBUG" in rendered
     assert "[FAIL] SECRET_KEY" in rendered
     assert "unsafe-development-secret-key" not in rendered
+
+
+@override_settings(
+    USE_REDIS_CACHE=True,
+    REDIS_URL="redis://redis:6379/0",
+)
+def test_deployment_check_verifies_redis_round_trip():
+    output = StringIO()
+
+    with (
+        patch("apps.audit.management.commands.deployment_check.cache.set") as cache_set,
+        patch("apps.audit.management.commands.deployment_check.cache.get", return_value="ok") as cache_get,
+        patch("apps.audit.management.commands.deployment_check.cache.delete") as cache_delete,
+    ):
+        call_command("deployment_check", stdout=output)
+
+    rendered = output.getvalue()
+    assert "[PASS] REDIS: Redis cache is enabled and reachable." in rendered
+    assert cache_set.called
+    assert cache_get.called
+    assert cache_delete.called
+
+
+@override_settings(
+    USE_REDIS_CACHE=True,
+    REDIS_URL="redis://redis:6379/0",
+)
+def test_deployment_check_fails_when_redis_round_trip_fails():
+    output = StringIO()
+
+    with patch("apps.audit.management.commands.deployment_check.cache.set", side_effect=ConnectionError("down")):
+        with pytest.raises(CommandError):
+            call_command("deployment_check", production=True, stdout=output)
+
+    rendered = output.getvalue()
+    assert "[FAIL] REDIS: Redis cache is enabled but connectivity failed: ConnectionError." in rendered
