@@ -39,9 +39,11 @@ RUN DJANGO_SETTINGS_MODULE=bidals.settings.prod \
     DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000 \
     python manage.py collectstatic --noinput
 
-RUN mkdir -p /app/media \
+RUN test -f /app/scripts/run_scheduled_job.sh \
+    && mkdir -p /app/media \
     && sed -i 's/\r$//' /app/scripts/run_scheduled_job.sh \
     && chmod +x /app/scripts/run_scheduled_job.sh \
+    && ln -sf /app/scripts/run_scheduled_job.sh /usr/local/bin/bidals-scheduled-job \
     && chown -R app:app /app/media /app/scripts/run_scheduled_job.sh
 
 EXPOSE 8000

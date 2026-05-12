@@ -1019,7 +1019,7 @@ Recommended cadence: every 5 minutes when `EMAIL_NOTIFICATIONS_ENABLED=True`. If
 
 Use GitHub as the source for the backend image. Add Render Cron Jobs or background worker jobs that run against the same backend image and environment as the web service.
 
-Use the scheduled-job wrapper instead of inline `python manage.py ...` commands. The wrapper changes into the backend directory, forces `DJANGO_SETTINGS_MODULE=bidals.settings.prod`, maps `DJANGO_DATABASE_URL` to `DATABASE_URL` when needed, verifies a database URL exists, and prints only safe diagnostics before running the command.
+Use the scheduled-job wrapper instead of inline `python manage.py ...` commands. The wrapper changes into the backend directory, requires `DJANGO_SETTINGS_MODULE=bidals.settings.prod`, maps `DJANGO_DATABASE_URL` to `DATABASE_URL` when needed, validates the minimum production env vars before importing Django, and prints only safe diagnostics before running the command.
 
 Render cron service settings:
 
@@ -1027,23 +1027,67 @@ Render cron service settings:
 - Runtime: Docker
 - Dockerfile Path: `backend/Dockerfile`
 - Docker Build Context Directory: `backend`
-- Environment: same backend staging/production env vars as the web service
+- Environment: copy the same backend staging/production env group/secrets used by the web service. Do not put secrets inline in the command field.
 
-Required env vars:
+Required env vars for every Render cron job:
 
 - `DJANGO_SETTINGS_MODULE=bidals.settings.prod`
-- `DATABASE_URL=<managed PostgreSQL URL>` or `DJANGO_DATABASE_URL=<managed PostgreSQL URL>`
 - `DJANGO_SECRET_KEY=<secret>`
 - `DJANGO_ALLOWED_HOSTS=<backend host>`
+- `DATABASE_URL=<managed PostgreSQL URL>` or `DJANGO_DATABASE_URL=<managed PostgreSQL URL>`
+
+These required vars apply to all three scheduled jobs, including `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
+
+Recommended to copy from the backend web service for parity:
+
+- `FRONTEND_URL`
+- `DJANGO_CORS_ALLOWED_ORIGINS`
+- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_SECURE_SSL_REDIRECT`
+- `DJANGO_SECURE_HSTS_SECONDS`
+- `DATABASE_CONN_MAX_AGE`
 - `USE_REDIS_CACHE=True`
 - `REDIS_URL=<managed Redis URL>`
-- `FRONTEND_URL=<frontend origin>`
+- `REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS`
+- `REDIS_SOCKET_TIMEOUT_SECONDS`
+- `REDIS_CACHE_KEY_PREFIX`
+- `USE_S3`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_STORAGE_BUCKET_NAME`
+- `AWS_S3_ENDPOINT_URL`
+- `AWS_S3_REGION_NAME`
+- `AWS_S3_CUSTOM_DOMAIN`
+- `AWS_QUERYSTRING_AUTH`
+- `AWS_S3_ADDRESSING_STYLE`
+- `AWS_S3_SIGNATURE_VERSION`
+- `AWS_S3_CACHE_CONTROL`
+- `EMAIL_NOTIFICATIONS_ENABLED`
+- `EMAIL_BACKEND`
+- `EMAIL_HOST`
+- `EMAIL_PORT`
+- `EMAIL_HOST_USER`
+- `EMAIL_HOST_PASSWORD`
+- `EMAIL_USE_TLS`
+- `DEFAULT_FROM_EMAIL`
+- `ALERT_WEBHOOK_URL`
+- `ALERT_WEBHOOK_TIMEOUT_SECONDS`
+
+The runner fails once with a combined missing-var list for the required vars above. Redis, S3, and email settings are reported as safe `pass`, `warn_*`, or `not_enabled` diagnostics without printing secret values.
 
 Commands:
 
-- Auction closer: `./scripts/run_scheduled_job.sh close_expired_auctions`
-- Anomaly monitor: `./scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
-- Notification delivery: `./scripts/run_scheduled_job.sh deliver_notifications`
+- Auction closer: `sh /app/scripts/run_scheduled_job.sh close_expired_auctions`
+- Anomaly monitor: `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
+- Notification delivery: `sh /app/scripts/run_scheduled_job.sh deliver_notifications`
+
+The image also exposes `/usr/local/bin/bidals-scheduled-job` as a symlink to the same runner. Either form is acceptable, but the `/app/scripts/...` command makes the copied file path explicit.
+
+Temporary diagnostic command if Render cannot find the runner:
+
+```bash
+sh -c 'pwd && ls -l /app/scripts/run_scheduled_job.sh /usr/local/bin/bidals-scheduled-job'
+```
 
 The older raw commands below are safe for local/manual runs from inside the backend directory, but should not be used as Render cron commands:
 

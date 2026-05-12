@@ -30,9 +30,9 @@ This document is the Phase 17 execution record. Fill in the evidence sections du
 - Redis cache/throttling: `REDIS_URL` with `USE_REDIS_CACHE=True`
 - Redis verification: `deployment_check --production` now performs a cache set/get/delete round-trip when `USE_REDIS_CACHE=True`
 - Scheduler commands:
-  - `./scripts/run_scheduled_job.sh close_expired_auctions`
-  - `./scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
-  - `./scripts/run_scheduled_job.sh deliver_notifications`
+  - `sh /app/scripts/run_scheduled_job.sh close_expired_auctions`
+  - `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
+  - `sh /app/scripts/run_scheduled_job.sh deliver_notifications`
 - Readiness commands:
   - `python manage.py deployment_check --production`
   - `python manage.py verify_backup`
@@ -147,13 +147,32 @@ Render cron service values:
 - Runtime: Docker
 - Dockerfile Path: `backend/Dockerfile`
 - Docker Build Context Directory: `backend`
-- Environment variables: copy the backend web service env group/secrets, including `DJANGO_SETTINGS_MODULE=bidals.settings.prod`, `DATABASE_URL` or `DJANGO_DATABASE_URL`, Redis vars, object-storage vars, alert/email vars as needed.
+- Environment variables: copy the backend web service env group/secrets to every cron job. Do not rely on inline command env vars.
+
+Required env vars for every Render cron job:
+
+- `DJANGO_SETTINGS_MODULE=bidals.settings.prod`
+- `DJANGO_SECRET_KEY=<same backend secret>`
+- `DJANGO_ALLOWED_HOSTS=<backend staging host>`
+- `DATABASE_URL=<Render PostgreSQL URL>` or `DJANGO_DATABASE_URL=<Render PostgreSQL URL>`
+
+These required vars apply to `close_expired_auctions`, `monitor_bid_anomalies`, and `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
+
+Copy these from the backend web service when enabled/configured:
+
+- Frontend/origin parity: `FRONTEND_URL`, `DJANGO_CORS_ALLOWED_ORIGINS`, `DJANGO_CSRF_TRUSTED_ORIGINS`
+- Redis: `USE_REDIS_CACHE`, `REDIS_URL`, `REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS`, `REDIS_SOCKET_TIMEOUT_SECONDS`, `REDIS_CACHE_KEY_PREFIX`
+- Object storage: `USE_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`, `AWS_S3_REGION_NAME`, `AWS_S3_CUSTOM_DOMAIN`, `AWS_QUERYSTRING_AUTH`, `AWS_S3_ADDRESSING_STYLE`, `AWS_S3_SIGNATURE_VERSION`, `AWS_S3_CACHE_CONTROL`
+- Email/notifications: `EMAIL_NOTIFICATIONS_ENABLED`, `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`
+- Alerts: `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TIMEOUT_SECONDS`
+
+The runner validates required vars before `django.setup()`. If several required vars are missing, it reports them together in one message and does not print secret values.
 
 | Job | Command | Suggested frequency | Result |
 | --- | --- | --- | --- |
-| Auction closing and winner calculation | `./scripts/run_scheduled_job.sh close_expired_auctions` | Every 1 minute, or the shortest Render-supported interval | PASS for one-off/manual run; cron evidence still needed |
-| Bid anomaly monitoring | `./scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60` | Every 5 minutes | OPEN - use wrapper to prevent SQLite/dev fallback |
-| Notification delivery | `./scripts/run_scheduled_job.sh deliver_notifications` | Every 5 minutes if email enabled | OPEN - use wrapper to prevent SQLite/dev fallback |
+| Auction closing and winner calculation | `sh /app/scripts/run_scheduled_job.sh close_expired_auctions` | Every 1 minute, or the shortest Render-supported interval | PASS for one-off/manual run; cron evidence still needed |
+| Bid anomaly monitoring | `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60` | Every 5 minutes | OPEN - use absolute wrapper path to prevent file-not-found and SQLite/dev fallback |
+| Notification delivery | `sh /app/scripts/run_scheduled_job.sh deliver_notifications` | Every 5 minutes if email enabled | OPEN - use absolute wrapper path to prevent file-not-found and SQLite/dev fallback |
 
 Evidence to capture:
 
@@ -163,9 +182,21 @@ Evidence to capture:
 - Expected safe diagnostics:
   - `scheduled_job=<job_name>`
   - `settings_module=bidals.settings.prod`
+  - `required_env=pass`
+  - `redis_env=pass` or `redis_env=not_enabled`
+  - `s3_env=pass` or `s3_env=not_enabled`
+  - `email_env=pass` or `email_env=not_enabled`
   - `database_engine=django.db.backends.postgresql`
   - `use_redis_cache=True`
 - Audit log event visible in `/dashboard/operations`:
+
+If Render cannot find the runner, temporarily set the cron command to:
+
+```bash
+sh -c 'pwd && ls -l /app/scripts/run_scheduled_job.sh /usr/local/bin/bidals-scheduled-job'
+```
+
+The production Docker build now fails if `/app/scripts/run_scheduled_job.sh` is missing, and also creates `/usr/local/bin/bidals-scheduled-job` as a stable symlink.
 
 ## Safe Staging Admin Setup
 
@@ -245,9 +276,9 @@ python manage.py seed_staging_data
 python manage.py deployment_check --production
 python manage.py verify_backup
 python manage.py release_check
-./scripts/run_scheduled_job.sh close_expired_auctions
-./scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60
-./scripts/run_scheduled_job.sh deliver_notifications
+sh /app/scripts/run_scheduled_job.sh close_expired_auctions
+sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60
+sh /app/scripts/run_scheduled_job.sh deliver_notifications
 ```
 
 Optional Playwright smoke against staging:
@@ -411,8 +442,8 @@ Remaining readiness warnings:
 | Critical | Staging bid endpoint returned `500` for authenticated valid bid, authenticated invalid bid, and anonymous bid probe. | Original failure reproduced on lot id `2`. After redeploy commit `cb9ca78`, fresh lot id `4` was tested with valid, invalid, and anonymous bid attempts. | FIXED AND VERIFIED - valid bid now returns `201 accepted`, invalid increment returns controlled `409 INVALID_INCREMENT`, anonymous bid returns controlled `401 UNAUTHENTICATED`, and lot state remains authoritative. |
 | Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-1.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
 | High | Documented staging admin credentials were not available. | Earlier `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`; staging admin setup was then repaired. | FIXED AND VERIFIED - `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. |
-| High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | OPEN - `close_expired_auctions` worked after path/env fixes, but `monitor_bid_anomalies` still hit SQLite/dev fallback. Scheduled jobs now must use `./scripts/run_scheduled_job.sh ...`; scheduler logs and restore proof remain. |
-| High | Render cron jobs can fall back to SQLite/dev settings when run as raw inline commands. | `python manage.py monitor_bid_anomalies --window-minutes 60` in Render cron failed with `django.db.utils.OperationalError: unable to open database file`. | FIXED IN CODE / PENDING REDEPLOY - use `backend/scripts/run_scheduled_job.sh` for all scheduled jobs. The wrapper forces `bidals.settings.prod`, requires `DATABASE_URL` or `DJANGO_DATABASE_URL`, changes into the backend directory, and prints safe diagnostics before execution. |
+| High | Scheduler and backup restore still need real Render execution evidence. | Attempt Phase 17 completion without Render scheduler logs and managed PostgreSQL restore proof. | OPEN - `close_expired_auctions` worked after path/env fixes, but `monitor_bid_anomalies` still hit SQLite/dev fallback. Scheduled jobs now must use `sh /app/scripts/run_scheduled_job.sh ...`; scheduler logs and restore proof remain. |
+| High | Render cron jobs can fall back to SQLite/dev settings when run as raw inline commands. | `python manage.py monitor_bid_anomalies --window-minutes 60` in Render cron failed with `django.db.utils.OperationalError: unable to open database file`. A later relative wrapper command failed with `sh: 0: cannot open scripts/run_scheduled_job.sh: No such file`. | FIXED IN CODE / PENDING REDEPLOY - use `sh /app/scripts/run_scheduled_job.sh ...` for all scheduled jobs. The Docker build now verifies the runner exists at `/app/scripts/run_scheduled_job.sh` and creates `/usr/local/bin/bidals-scheduled-job`. The wrapper requires `bidals.settings.prod`, validates `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, and `DATABASE_URL` or `DJANGO_DATABASE_URL` before importing Django, changes into the backend directory, and prints safe diagnostics before execution. |
 | Medium | Managed backup restore cannot be fully verified on current free Render Postgres setup. | Try to provide provider-managed backup/restore evidence from free staging database. | OPEN/WARN - use supported Render plan/provider restore path or manual non-production `pg_dump` restore rehearsal. |
 | Medium | `release_check` and `deployment_check --production` failed in Render shell because the health probe hit `/api/health` and received Django's trailing-slash `301` redirect. | Run `python manage.py release_check` or `python manage.py deployment_check --production` in Render shell before the readiness health-path fix. | FIXED AND VERIFIED - Render shell checks now pass the health endpoint after switching readiness checks to `/api/health/` with redirect-safe behavior. |
 | High | Create lot form could create duplicate lots during demo flow. | Rapid repeat submit, or retry after a post-create image-upload failure, could send another lot create request. | FIXED IN CODE / PENDING REDEPLOY - frontend now has a synchronous in-flight submit guard, disabled submit state, and post-create image upload retry path that does not create another lot. |
@@ -426,7 +457,7 @@ Remaining readiness warnings:
 - Continue monitoring Redis-backed bid throttling during live smoke tests; Redis is now configured and verified by `deployment_check --production`.
 - Continue using object storage for persistent media; `deployment_check --production` now reports MEDIA_STORAGE pass. Optional follow-up: upload a lot image, redeploy/restart Render, and confirm the image still loads from object storage.
 - Run `python manage.py migrate` on the staging backend and confirm no unapplied migrations.
-- Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery using `./scripts/run_scheduled_job.sh ...`.
+- Configure Render scheduled jobs for auction closing, anomaly monitoring, and notification delivery using `sh /app/scripts/run_scheduled_job.sh ...`.
 - Capture successful scheduler logs showing `settings_module=bidals.settings.prod` and `database_engine=django.db.backends.postgresql`; confirm related audit/operations visibility.
 - Create or identify a managed PostgreSQL backup, or document the free Render Postgres limitation and run a non-production manual restore rehearsal when possible.
 - Restore the backup/dump into staging or a restore-test database.
