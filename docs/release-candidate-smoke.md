@@ -15,6 +15,42 @@ npm run smoke:release-candidate
 
 The script is API-level and uses the deployed backend API for lifecycle checks. It also checks the deployed frontend health endpoint through `RC_SMOKE_FRONTEND_URL`.
 
+## Latest Render Staging Result
+
+Final rerun after the audit endpoint check was corrected:
+
+```text
+PASS=19
+WARN=2
+FAIL=0
+```
+
+Confirmed PASS evidence:
+
+- Frontend health.
+- Seller, bidder, and admin login.
+- Create live auction.
+- Create lot.
+- Upload lot image.
+- Browse created auction and lot.
+- Valid bid accepted by the backend.
+- Invalid bid returns a controlled backend rejection.
+- Bid history.
+- Bid audit log check through `GET /api/lots/{lot_id}/audit/`.
+- Admin export CSV.
+- Auction closing and winner calculation.
+- Fulfillment update.
+- Bidder won-lots reflects backend-owned state.
+- Notification unread and mark-read.
+- Repair workflow access.
+
+Remaining WARN items:
+
+- Second admin login is not configured.
+- Full two-admin repair create/approve/apply is skipped until `RC_SMOKE_ADMIN2_USERNAME` and `RC_SMOKE_ADMIN2_PASSWORD` are configured.
+
+This means the release candidate smoke gate passes with `FAIL=0`. Backup/restore proof remains a separate production go/no-go requirement outside this script.
+
 ## Required Environment Variables
 
 Do not commit these values. Set them in your shell, CI secret store, or local secure environment.
@@ -79,7 +115,7 @@ Automated:
 - Place valid bid and confirm backend accepted response.
 - Place invalid bid and confirm controlled backend rejection.
 - Confirm bid history includes accepted and seller-visible rejected bid records.
-- Confirm admin-visible audit logs for accepted/rejected bids.
+- Confirm admin-visible audit logs for accepted/rejected bids through `GET /api/lots/{id}/audit/`.
 - Download admin activity CSV export.
 - Wait for Render cron-backed auction close and winner calculation.
 - Confirm winner uses the accepted backend bid created by this smoke run.
@@ -143,3 +179,10 @@ If repair workflow is WARN:
 1. Create or configure a second staging admin.
 2. Set `RC_SMOKE_ADMIN2_USERNAME` and `RC_SMOKE_ADMIN2_PASSWORD`.
 3. Re-run with `RC_SMOKE_REPAIR_MODE=full` if you want the warning to become release-blocking.
+
+If the bid audit check fails:
+
+1. Use `GET /api/lots/{id}/audit/` for lot-specific audit smoke checks.
+2. Do not filter the global audit endpoint only by `entity_type=lot&entity_id=<lot id>` when checking bid events.
+3. Bid audit records are written as `entity_type=bid` and linked to the lot through `metadata.lot_id`.
+4. The expected actions are `bid_accepted` and `bid_rejected`.

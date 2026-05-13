@@ -155,6 +155,30 @@ def test_invalid_bid_returns_rejection_when_rate_limit_cache_is_unavailable():
     assert AuditLog.objects.filter(action=AuditAction.BID_REJECTED, entity_id=str(bid.id)).exists()
 
 
+def test_lot_audit_endpoint_includes_bid_audit_events_by_metadata_lot_id():
+    lot = create_live_lot()
+    bidder = create_user("audit_bidder")
+    client = APIClient()
+    client.force_authenticate(user=bidder)
+
+    accepted = client.post(f"/api/lots/{lot.id}/bid/", {"amount": "100.00"}, format="json")
+    rejected = client.post(f"/api/lots/{lot.id}/bid/", {"amount": "105.00"}, format="json")
+
+    client.force_authenticate(user=lot.auction.created_by)
+    response = client.get(f"/api/lots/{lot.id}/audit/")
+
+    actions = {entry["action"] for entry in response.data}
+    bid_entries = [entry for entry in response.data if entry["action"] in {AuditAction.BID_ACCEPTED, AuditAction.BID_REJECTED}]
+
+    assert accepted.status_code == 201
+    assert rejected.status_code == 409
+    assert response.status_code == 200
+    assert AuditAction.BID_ACCEPTED in actions
+    assert AuditAction.BID_REJECTED in actions
+    assert {entry["entity_type"] for entry in bid_entries} == {"bid"}
+    assert {entry["metadata"]["lot_id"] for entry in bid_entries} == {lot.id}
+
+
 def test_anonymous_bid_returns_controlled_rejection_when_rate_limit_cache_is_unavailable():
     lot = create_live_lot()
     client = APIClient()
