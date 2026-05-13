@@ -146,7 +146,7 @@ BIDALS is a secure, cloud-ready digital auction platform. The backend is designe
 
 Phase 17 is a real cloud validation phase, not a feature phase. The selected staging provider is Render. The execution record lives in [`docs/staging-rehearsal-render.md`](docs/staging-rehearsal-render.md).
 
-Current rehearsal status: staging core is operationally healthy on Render. Backend/frontend health, auth, auction/lot creation, browsing, bidding, Redis-backed throttling, S3/R2 object storage, admin access, and scheduled jobs have live evidence. Production go/no-go still depends on backup/restore proof and the release candidate smoke suite.
+Current rehearsal status: staging core is operationally healthy on Render. Backend/frontend health, auth, auction/lot creation, browsing, bidding, Redis-backed throttling, S3/R2 object storage, admin access, scheduled jobs, and the release candidate smoke suite have live evidence. Production go/no-go still depends on backup/restore proof and disaster recovery validation.
 
 Phase 17 evidence must include:
 
@@ -165,6 +165,22 @@ npm run smoke:release-candidate
 ```
 
 See [`docs/release-candidate-smoke.md`](docs/release-candidate-smoke.md) for required environment variables and the PASS/WARN/FAIL report format.
+
+## Phase 18 Production Readiness
+
+Phase 18 closes the remaining production blocker by making backup/restore and disaster recovery testable.
+
+New operational docs:
+
+- [`docs/disaster-recovery.md`](docs/disaster-recovery.md): Render PostgreSQL backup/restore rehearsal, `pg_dump`/`pg_restore` helpers, post-restore validation, outage guides, and secrets separation.
+- [`docs/production-release-checklist.md`](docs/production-release-checklist.md): release approval gate, env checks, cron checks, Redis/R2 checks, and go/no-go criteria.
+- [`docs/rollback-runbook.md`](docs/rollback-runbook.md): code rollback, migration-aware rollback, and database recovery rollback.
+
+Safe helper scripts, run from a repo checkout on an operator machine or CI runner with PostgreSQL client tools installed:
+
+- `sh scripts/pg_dump_backup.sh`: creates a custom-format PostgreSQL dump without printing secrets.
+- `sh scripts/restore_to_test_db.sh`: restores only to an explicitly confirmed non-production restore-test database.
+- `sh scripts/post_restore_validate.sh`: runs migrations/readiness checks and optional RC smoke against the restored environment.
 
 ## Phase Plan
 
@@ -185,6 +201,7 @@ See [`docs/release-candidate-smoke.md`](docs/release-candidate-smoke.md) for req
 15. Admin exports, repair audit detail, deployment checks, and rollout governance.
 16. Staging seed strategy, backup verification, release checklist UI/reporting, and production runbook tightening.
 17. Real cloud staging rehearsal with scheduler, backup restore, release check, and live smoke validation.
+18. Production readiness with documented backup/restore rehearsal, disaster recovery, release approval, rollback, and restore validation helpers.
 
 ## Local Development
 
@@ -803,6 +820,25 @@ Provider-specific verification:
 
 Do not run destructive restore operations from `verify_backup`; restore tests belong in staging or provider tooling.
 
+Phase 18 helper scripts for non-production rehearsals, run from the repository root:
+
+```bash
+DATABASE_URL='<postgres-url>' BIDALS_ENV=staging sh scripts/pg_dump_backup.sh
+
+BACKUP_FILE=backups/<dump-file>.dump \
+RESTORE_DATABASE_URL='<restore-test-postgres-url>' \
+RESTORE_TARGET_ENV=restore-test \
+RESTORE_TARGET_CONFIRM=non-production-restore-ok \
+sh scripts/restore_to_test_db.sh
+
+DJANGO_SETTINGS_MODULE=bidals.settings.prod \
+DATABASE_URL='<restore-test-postgres-url>' \
+API_BASE_URL=https://<restore-test-backend>/api \
+sh scripts/post_restore_validate.sh
+```
+
+`restore_to_test_db.sh` refuses to run unless the target database is explicitly confirmed as non-production and differs from the active `DATABASE_URL`. The full procedure lives in [`docs/disaster-recovery.md`](docs/disaster-recovery.md).
+
 ## Release Readiness
 
 Generate a release readiness report from the backend:
@@ -820,6 +856,8 @@ GET /api/admin/release-check/
 The report groups checks into `system`, `database`, `backup`, `core_flows`, `ops`, and `notifications`. Automated checks cover hardening, migrations, the health endpoint, backup readiness, audit log readability, configured anomaly thresholds, and notification delivery safety. Manual checks deliberately remain `WARN` until an operator verifies real deployed flows such as login, auction creation, accepted/rejected bidding, winner calculation, fulfillment, unread count, and repair workflow access.
 
 ## Rollout Checklists
+
+Detailed production release and rollback runbooks live in [`docs/production-release-checklist.md`](docs/production-release-checklist.md) and [`docs/rollback-runbook.md`](docs/rollback-runbook.md).
 
 Staging rollout:
 
@@ -1392,6 +1430,8 @@ RC_SMOKE_ADMIN2_PASSWORD=<second-admin-password>
 
 The runner creates uniquely named `[RC SMOKE]` staging records, waits for the deployed cron-backed auction close path, and reports `PASS`, `WARN`, and `FAIL`. It validates seller/bidder/admin login, auction and lot creation, optional image upload, accepted and rejected bid responses, bid history, audit logs, admin CSV export, winner outcome calculation, fulfillment, won-lots, notifications, mark-read, and repair workflow access. Full repair request/approve/apply runs when second-admin credentials are configured.
 
+Current Render staging evidence: the release candidate smoke suite passes with `PASS=19`, `WARN=2`, `FAIL=0`. Remaining `WARN` items are second-admin credentials and the skipped full two-admin repair create/approve/apply path. Backup/restore proof is a separate production go/no-go requirement.
+
 The runner does not calculate winners, bypass bid rules, alter historical bids, or use frontend state as authority. Details live in [`docs/release-candidate-smoke.md`](docs/release-candidate-smoke.md).
 
 ## Dashboard Filtering
@@ -1516,7 +1556,7 @@ Use provider-managed PostgreSQL backups for production. Recommended baseline:
 Manual backup example when you have direct PostgreSQL access:
 
 ```bash
-pg_dump "$DATABASE_URL" --format=custom --file=bidals-$(date +%Y%m%d-%H%M).dump
+DATABASE_URL='<postgres-url>' BIDALS_ENV=staging sh scripts/pg_dump_backup.sh
 ```
 
 Do not rely on container filesystem snapshots for PostgreSQL backups. Uploaded production media should live in object storage such as Cloudflare R2, S3, or Spaces and should have its own lifecycle/backup policy.
@@ -1542,6 +1582,25 @@ Restore to staging first whenever possible:
 6. Test login, auction browsing, accepted bid, rejected bid, and audit visibility.
 7. Validate object storage media URLs for lot images.
 8. Promote the restored database only after validation.
+
+Guarded restore-test helper:
+
+```bash
+BACKUP_FILE=backups/<dump-file>.dump \
+RESTORE_DATABASE_URL='<restore-test-postgres-url>' \
+RESTORE_TARGET_ENV=restore-test \
+RESTORE_TARGET_CONFIRM=non-production-restore-ok \
+sh scripts/restore_to_test_db.sh
+```
+
+Post-restore validation helper:
+
+```bash
+DJANGO_SETTINGS_MODULE=bidals.settings.prod \
+DATABASE_URL='<restore-test-postgres-url>' \
+API_BASE_URL=https://<restore-test-backend>/api \
+sh scripts/post_restore_validate.sh
+```
 
 BIDALS-specific post-restore checks:
 

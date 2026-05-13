@@ -10,6 +10,9 @@ htmlcov/
 # Django
 staticfiles/
 media/
+backups/
+*.dump
+*.backup
 
 # Node / Next.js
 node_modules/

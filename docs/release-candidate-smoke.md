@@ -49,7 +49,7 @@ Remaining WARN items:
 - Second admin login is not configured.
 - Full two-admin repair create/approve/apply is skipped until `RC_SMOKE_ADMIN2_USERNAME` and `RC_SMOKE_ADMIN2_PASSWORD` are configured.
 
-This means the release candidate smoke gate passes with `FAIL=0`. Backup/restore proof remains a separate production go/no-go requirement outside this script.
+This means the release candidate smoke gate passes with `FAIL=0`. Backup/restore proof remains a separate production go/no-go requirement outside this script; use [`disaster-recovery.md`](disaster-recovery.md) and [`production-release-checklist.md`](production-release-checklist.md) for that gate.
 
 ## Required Environment Variables
 
@@ -132,7 +132,7 @@ Some checks remain WARN unless the staging environment is configured for them:
 - Auction close/winner calculation becomes WARN if Render cron does not close the auction before `RC_SMOKE_CLOSE_WAIT_SECONDS`.
 - Full two-admin repair workflow is WARN unless `RC_SMOKE_ADMIN2_USERNAME` and `RC_SMOKE_ADMIN2_PASSWORD` are provided.
 - Image upload is WARN only when explicitly disabled with `RC_SMOKE_UPLOAD_IMAGE=false`; otherwise upload failure is a FAIL.
-- Backup/restore verification is not performed by this script. Use `python manage.py verify_backup` and the provider restore runbook.
+- Backup/restore verification is not performed by this script. Use `python manage.py verify_backup`, [`disaster-recovery.md`](disaster-recovery.md), and the provider restore runbook.
 
 ## Expected Staging Behavior
 

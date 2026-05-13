@@ -17,6 +17,7 @@ export default function NewLotPage() {
   const submitInFlightRef = useRef(false);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [auctionId, setAuctionId] = useState("");
+  const [preselectedAuctionId, setPreselectedAuctionId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startingPrice, setStartingPrice] = useState("");
@@ -42,6 +43,11 @@ export default function NewLotPage() {
   }
 
   useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    setPreselectedAuctionId(search.get("auction") ?? search.get("auction_id") ?? "");
+  }, []);
+
+  useEffect(() => {
     async function load() {
       setIsLoading(true);
       try {
@@ -62,6 +68,13 @@ export default function NewLotPage() {
     if (user.role === "admin") return auctions;
     return auctions.filter((auction) => auction.created_by === user.id);
   }, [auctions, user]);
+
+  useEffect(() => {
+    if (!preselectedAuctionId || auctionId) return;
+    if (ownedAuctions.some((auction) => String(auction.id) === preselectedAuctionId)) {
+      setAuctionId(preselectedAuctionId);
+    }
+  }, [auctionId, ownedAuctions, preselectedAuctionId]);
 
   const selectedAuction = useMemo(
     () => ownedAuctions.find((auction) => String(auction.id) === auctionId) ?? null,

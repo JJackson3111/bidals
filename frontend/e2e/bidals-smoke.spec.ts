@@ -79,9 +79,10 @@ test.describe("BIDALS smoke", () => {
     await updateAuctionResponsePromise;
     await page.goto(`/auctions/${auctionId}`);
     await expect(page.getByRole("heading", { name: editedAuctionTitle })).toBeVisible();
+    await expect(page.getByText("No lots added yet")).toBeVisible();
 
-    await page.goto("/dashboard/lots/new");
-    await page.getByLabel("Auction").selectOption({ label: editedAuctionTitle });
+    await page.getByRole("link", { name: /create lot for this auction/i }).click();
+    await expect(page.getByLabel("Auction")).toHaveValue(String(auctionId));
     await page.getByLabel("Title").fill(lotTitle);
     await page.getByLabel("Description").fill("Smoke-test lot created through the UI.");
     await page.getByLabel("Starting price").fill("10.00");

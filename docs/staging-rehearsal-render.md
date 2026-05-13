@@ -465,6 +465,13 @@ Remaining readiness warnings:
 - Optional: upload a lot image, redeploy/restart Render, and confirm the image still loads from object storage as a persistence spot check.
 - Optional: keep monitoring Redis-backed bid throttling and scheduled job logs during normal staging use.
 
+Phase 18 adds the repeatable path for the first three bullets:
+
+- [`disaster-recovery.md`](disaster-recovery.md) documents Render PostgreSQL backup/restore rehearsal, `pg_dump`, restore-test validation, and disaster recovery.
+- [`production-release-checklist.md`](production-release-checklist.md) documents the production go/no-go gate.
+- [`rollback-runbook.md`](rollback-runbook.md) documents code rollback, migration-aware rollback, and database recovery rollback.
+- Helper scripts are available at `scripts/pg_dump_backup.sh`, `scripts/restore_to_test_db.sh`, and `scripts/post_restore_validate.sh`.
+
 ## Production Go/No-Go
 
 Must-have before production:
