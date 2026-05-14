@@ -10,6 +10,9 @@
   --brand-green: #CEFB04;
   --brand-green-hover: rgba(206, 251, 4, 0.75);
   --brand-green-soft: rgba(206, 251, 4, 0.2);
+  --brand-green-nav-hover: rgba(206, 251, 4, 0.14);
+  --brand-green-nav-active: rgba(206, 251, 4, 0.18);
+  --brand-green-nav-border: rgba(206, 251, 4, 0.42);
   --primary: var(--brand-green);
   --primary-strong: var(--ink);
   --accent: #b6652c;
@@ -153,14 +156,21 @@ button:disabled {
 }
 
 .nav-product-link {
+  border: 1px solid transparent;
   color: #4f5d58;
   gap: 7px;
   padding: 8px 12px;
 }
 
-.nav-product-link:hover,
+.nav-product-link:hover {
+  background: var(--brand-green-nav-hover);
+  border-color: var(--brand-green-nav-border);
+  color: var(--ink);
+}
+
 .nav-product-link.active {
-  background: var(--brand-green-hover);
+  background: var(--brand-green-nav-active);
+  border-color: var(--brand-green-nav-border);
   color: var(--ink);
 }
 
