@@ -39,7 +39,7 @@ export default function LandingPage() {
             Login / Register
           </Link>
         </div>
-        <div className="feed-grid">
+        <div className="feed-grid" id="how-it-works">
           <div className="detail-panel">
             <ShieldCheck size={22} aria-hidden="true" />
             <strong>Server authority</strong>
@@ -60,4 +60,3 @@ export default function LandingPage() {
     </main>
   );
 }
-

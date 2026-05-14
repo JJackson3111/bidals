@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LayoutDashboard, LogIn, LogOut, Search, Trophy, UserPlus } from "lucide-react";
+import { Bell, LogOut, Search } from "lucide-react";
 
 import { useAuth } from "@/components/AuthProvider";
 import { api } from "@/lib/api";
 import { canManageAuctions } from "@/lib/auth";
 
-const navItems = [
+const productNavItems = [
   { href: "/auctions", label: "Browse", icon: Search },
-  { href: "/account/won-lots", label: "Won", icon: Trophy, authenticated: true },
-  { href: "/account/notifications", label: "Alerts", icon: Bell, authenticated: true },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, protected: true },
+  { href: "/#how-it-works", label: "How It Works" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export function MobileNav() {
@@ -68,50 +67,50 @@ export function MobileNav() {
         <span className="brand-wordmark">BIDALS</span>
       </Link>
 
-      <nav className="nav-actions" aria-label="Primary navigation">
-        {navItems.map((item) => {
-          if (item.authenticated && !user) return null;
-          if (item.protected && !canUseDashboard) return null;
+      <nav className="product-nav" aria-label="Product navigation">
+        {productNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isActive = item.href === "/auctions" && (pathname === "/auctions" || pathname.startsWith("/auctions/"));
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`icon-link ${isActive ? "active" : ""}`}
-              title={item.label}
-              aria-label={item.label}
-            >
+            <Link key={item.href} href={item.href} className={`nav-product-link ${isActive ? "active" : ""}`}>
+              {Icon ? <Icon size={15} aria-hidden="true" /> : null}
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <nav className="nav-actions" aria-label="Primary navigation">
+        {user ? (
+          <>
+            <Link className="nav-utility-link" href="/account/notifications" title="Alerts" aria-label="Alerts">
               <span className="nav-icon-wrap">
-                <Icon size={18} aria-hidden="true" />
-                {item.href === "/account/notifications" && unreadCount > 0 ? (
+                <Bell size={17} aria-hidden="true" />
+                {unreadCount > 0 ? (
                   <span className="nav-badge" aria-label={`${unreadCount} unread notifications`}>
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 ) : null}
               </span>
-              <span>{item.label}</span>
+              <span>Alerts</span>
             </Link>
-          );
-        })}
-
-        {user ? (
-          <button className="icon-button" type="button" onClick={handleLogout} title="Logout" aria-label="Logout">
-            <LogOut size={18} aria-hidden="true" />
-            <span>Logout</span>
-          </button>
-        ) : (
-          <>
-            <Link className="icon-link" href="/login" title="Login" aria-label="Login">
-              <LogIn size={18} aria-hidden="true" />
-              <span>Login</span>
-            </Link>
-            <Link className="icon-link compact-hide" href="/register" title="Register" aria-label="Register">
-              <UserPlus size={18} aria-hidden="true" />
-              <span>Register</span>
+            <Link className="nav-secondary-action auth-dashboard-action" href={canUseDashboard ? "/dashboard" : "/account/won-lots"}>
+              {canUseDashboard ? "Dashboard" : "Won lots"}
             </Link>
           </>
+        ) : (
+          <Link className="nav-secondary-action nav-login-action" href="/login">
+            Login
+          </Link>
         )}
+        <Link className="nav-primary-action" href="/dashboard/auctions/new">
+          Start Auction
+        </Link>
+        {user ? (
+          <button className="nav-logout-button" type="button" onClick={handleLogout} title="Logout" aria-label="Logout">
+            <LogOut size={17} aria-hidden="true" />
+          </button>
+        ) : null}
       </nav>
     </header>
   );
