@@ -81,20 +81,32 @@ button:disabled {
 }
 
 .brand-link {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 800;
+  gap: 10px;
   white-space: nowrap;
 }
 
 .brand-mark {
   align-items: center;
-  background: var(--ink);
-  border-radius: 8px;
-  color: #fff;
   display: inline-flex;
-  height: 34px;
+  height: 36px;
   justify-content: center;
-  width: 34px;
+  overflow: hidden;
+  width: 36px;
+}
+
+.brand-logo {
+  display: block;
+  height: 36px;
+  object-fit: contain;
+  width: 36px;
+}
+
+.brand-wordmark {
+  color: var(--ink);
+  font-weight: 900;
+  line-height: 1;
 }
 
 .nav-actions {
@@ -212,11 +224,11 @@ p {
 
 .hero-feed-snapshot {
   display: grid;
-  gap: 12px;
-  opacity: 0.52;
+  gap: 10px;
+  opacity: 0.46;
   position: absolute;
   right: max(18px, 6vw);
-  top: 54px;
+  top: 44px;
   transform: rotate(-4deg);
   width: min(430px, 70vw);
 }
@@ -249,19 +261,32 @@ p {
 
 .landing-content {
   display: grid;
-  gap: 22px;
-  max-width: 760px;
+  gap: 18px;
+  max-width: 720px;
   min-height: calc(100vh - 64px);
-  padding: 72px 16px 116px;
+  padding: 56px 16px 86px;
   place-content: center start;
   position: relative;
   z-index: 1;
 }
 
+.landing-content h1 {
+  text-wrap: balance;
+}
+
 .landing-content p {
   color: #39423e;
-  font-size: 1.12rem;
-  max-width: 620px;
+  font-size: 1.08rem;
+  max-width: 590px;
+}
+
+.landing-content .feed-grid {
+  margin-top: 4px;
+}
+
+.landing-content .detail-panel {
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
 }
 
 .hero-actions,

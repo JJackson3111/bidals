@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Gavel, LayoutDashboard, LogIn, LogOut, Search, Trophy, UserPlus } from "lucide-react";
+import { Bell, LayoutDashboard, LogIn, LogOut, Search, Trophy, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/components/AuthProvider";
 import { api } from "@/lib/api";
@@ -62,9 +63,9 @@ export function MobileNav() {
     <header className="mobile-nav">
       <Link href="/" className="brand-link" aria-label="BIDALS home">
         <span className="brand-mark">
-          <Gavel size={18} aria-hidden="true" />
+          <Image className="brand-logo" src="/bidals-logo-mark.png" alt="" width={36} height={36} aria-hidden="true" priority />
         </span>
-        <span>BIDALS</span>
+        <span className="brand-wordmark">BIDALS</span>
       </Link>
 
       <nav className="nav-actions" aria-label="Primary navigation">
