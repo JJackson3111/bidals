@@ -1,3 +1,5 @@
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap");
+
 :root {
   --bg: #f4f7f6;
   --surface: #ffffff;
@@ -5,8 +7,11 @@
   --ink: #17211e;
   --muted: #62716c;
   --line: #d9e3df;
-  --primary: #087f5b;
-  --primary-strong: #064d3a;
+  --brand-green: #CEFB04;
+  --brand-green-hover: rgba(206, 251, 4, 0.75);
+  --brand-green-soft: rgba(206, 251, 4, 0.2);
+  --primary: var(--brand-green);
+  --primary-strong: var(--ink);
   --accent: #b6652c;
   --danger: #bf3d3d;
   --info: #3b6c8f;
@@ -25,7 +30,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Satoshi", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.5;
   letter-spacing: 0;
@@ -82,7 +87,7 @@ button:disabled {
 
 .brand-link {
   font-size: 1.02rem;
-  font-weight: 800;
+  font-weight: 700;
   gap: 10px;
   min-width: 0;
   white-space: nowrap;
@@ -106,7 +111,7 @@ button:disabled {
 
 .brand-wordmark {
   color: var(--ink);
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -135,7 +140,7 @@ button:disabled {
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 700;
   min-height: 38px;
   transition:
     background 160ms ease,
@@ -155,8 +160,8 @@ button:disabled {
 
 .nav-product-link:hover,
 .nav-product-link.active {
-  background: #f0f6f3;
-  color: var(--primary-strong);
+  background: var(--brand-green-hover);
+  color: var(--ink);
 }
 
 .nav-secondary-action,
@@ -172,8 +177,8 @@ button:disabled {
 .nav-secondary-action:hover,
 .nav-utility-link:hover,
 .nav-logout-button:hover {
-  background: #f4f8f6;
-  border-color: #dfe8e4;
+  background: var(--brand-green-soft);
+  border-color: rgba(206, 251, 4, 0.56);
   color: var(--ink);
 }
 
@@ -181,13 +186,14 @@ button:disabled {
   background: var(--ink);
   border: 1px solid var(--ink);
   box-shadow: 0 8px 18px rgba(23, 33, 30, 0.12);
-  color: #c5ff00;
+  color: var(--brand-green);
   justify-content: center;
   padding: 8px 15px;
 }
 
 .nav-primary-action:hover {
   background: #0f1714;
+  border-color: var(--brand-green);
   box-shadow: 0 10px 22px rgba(23, 33, 30, 0.16);
   transform: translateY(-1px);
 }
@@ -237,9 +243,9 @@ button:disabled {
 .icon-link.active,
 .icon-link:hover,
 .icon-button:hover {
-  background: #eef8f3;
-  border-color: #cfdfd7;
-  color: var(--primary-strong);
+  background: var(--brand-green-soft);
+  border-color: rgba(206, 251, 4, 0.56);
+  color: var(--ink);
 }
 
 .icon-button {
@@ -273,6 +279,7 @@ button:disabled {
 h1,
 h2,
 h3 {
+  font-weight: 700;
   line-height: 1.1;
   margin: 0;
 }
@@ -302,7 +309,7 @@ p {
 }
 
 .hero-visual-layer {
-  background: linear-gradient(135deg, #f8fbfa 0%, #e8f6f1 54%, #f6ece3 100%);
+  background: linear-gradient(135deg, #f8fbfa 0%, rgba(206, 251, 4, 0.16) 54%, #eef3ef 100%);
   inset: 0;
   position: absolute;
 }
@@ -329,7 +336,7 @@ p {
 }
 
 .snapshot-media {
-  background: linear-gradient(135deg, #1f2523, #087f5b);
+  background: linear-gradient(135deg, #1f2523, var(--brand-green));
   border-radius: 8px;
   height: 88px;
 }
@@ -384,20 +391,30 @@ p {
 .primary-button,
 .secondary-button {
   border-radius: 8px;
-  font-weight: 800;
+  font-weight: 700;
   justify-content: center;
   min-height: 44px;
   padding: 10px 14px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .primary-button {
-  background: var(--primary);
-  border: 1px solid var(--primary);
-  color: #fff;
+  background: var(--brand-green);
+  border: 1px solid var(--brand-green);
+  box-shadow: 0 8px 18px rgba(23, 33, 30, 0.1);
+  color: var(--ink);
 }
 
 .primary-button:hover {
-  background: var(--primary-strong);
+  background: var(--brand-green-hover);
+  border-color: var(--brand-green);
+  box-shadow: 0 10px 22px rgba(23, 33, 30, 0.14);
+  transform: translateY(-1px);
 }
 
 .secondary-button {
@@ -406,9 +423,14 @@ p {
   color: var(--ink);
 }
 
+.secondary-button:hover {
+  background: var(--brand-green-soft);
+  border-color: rgba(206, 251, 4, 0.56);
+}
+
 .text-link {
   color: var(--primary-strong);
-  font-weight: 800;
+  font-weight: 700;
   width: fit-content;
 }
 
@@ -1070,7 +1092,7 @@ p {
 
 .unread-card {
   border-color: var(--primary);
-  box-shadow: 0 0 0 1px rgba(26, 109, 82, 0.12);
+  box-shadow: 0 0 0 1px rgba(206, 251, 4, 0.28);
 }
 
 .timeline-list {
