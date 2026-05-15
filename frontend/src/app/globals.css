@@ -810,6 +810,11 @@ p {
   padding: 24px;
 }
 
+.landing-feature-card:hover .feature-icon-box {
+  box-shadow: 0 12px 26px rgba(23, 33, 30, 0.12), 0 0 0 1px rgba(206, 251, 4, 0.22);
+  transform: translateY(-2px) scale(1.015);
+}
+
 .landing-feature-card p {
   line-height: 1.65;
 }
@@ -829,6 +834,67 @@ p {
 .landing-icon-box {
   height: 46px;
   width: 46px;
+}
+
+.feature-icon-box {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.74), rgba(206, 251, 4, 0.26)),
+    #f7faf2;
+  border: 2px solid rgba(23, 33, 30, 0.84);
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(23, 33, 30, 0.08);
+  color: var(--ink);
+  height: 58px;
+  overflow: hidden;
+  position: relative;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  width: 58px;
+}
+
+.feature-icon-box::before {
+  background: rgba(206, 251, 4, 0.78);
+  border: 2px solid rgba(23, 33, 30, 0.88);
+  border-radius: 999px;
+  content: "";
+  height: 24px;
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  width: 24px;
+}
+
+.feature-icon-box::after {
+  background: rgba(23, 33, 30, 0.08);
+  border-radius: 999px;
+  bottom: 8px;
+  content: "";
+  height: 6px;
+  left: 9px;
+  position: absolute;
+  width: 28px;
+}
+
+.feature-icon-box svg {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5));
+  position: relative;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  z-index: 2;
+}
+
+.feature-icon-accent {
+  background: rgba(206, 251, 4, 0.58);
+  border: 2px solid rgba(23, 33, 30, 0.14);
+  border-radius: 12px;
+  bottom: 9px;
+  height: 24px;
+  position: absolute;
+  right: 9px;
+  transform: rotate(-8deg);
+  width: 26px;
+  z-index: 1;
 }
 
 .landing-icon-box.compact {

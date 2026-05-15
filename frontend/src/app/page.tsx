@@ -272,8 +272,9 @@ export default function LandingPage() {
               const Icon = feature.icon;
               return (
                 <article className="landing-feature-card" key={feature.title}>
-                  <div className="landing-icon-box">
-                    <Icon size={24} aria-hidden="true" />
+                  <div className="landing-icon-box feature-icon-box">
+                    <span className="feature-icon-accent" aria-hidden="true" />
+                    <Icon size={28} strokeWidth={2.8} aria-hidden="true" />
                   </div>
                   <h2>{feature.title}</h2>
                   <p>{feature.description}</p>
