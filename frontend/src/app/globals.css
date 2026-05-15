@@ -841,8 +841,13 @@ p {
 
 .feature-icon-mark svg {
   display: block;
+  fill: rgba(206, 251, 4, 0.16);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.feature-icon-svg {
+  color: var(--ink);
 }
 
 .landing-icon-box.compact {
