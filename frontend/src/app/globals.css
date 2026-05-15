@@ -948,6 +948,102 @@ p {
   gap: 12px;
 }
 
+.auction-progress-module {
+  background:
+    linear-gradient(135deg, rgba(206, 251, 4, 0.1), transparent 42%),
+    rgba(244, 247, 246, 0.86);
+  border: 1px solid rgba(23, 33, 30, 0.07);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  padding: 16px;
+  position: relative;
+}
+
+.auction-progress-header {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.auction-progress-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.auction-progress-header span,
+.auction-progress-header small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.auction-progress-header strong {
+  color: var(--ink);
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.auction-progress-header small {
+  padding-top: 3px;
+  text-align: right;
+}
+
+.auction-progress-track {
+  background: rgba(23, 33, 30, 0.1);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.auction-progress-fill {
+  animation: bidals-progress-grow 950ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  background: linear-gradient(90deg, var(--brand-green), rgba(206, 251, 4, 0.72));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 51%;
+}
+
+.latest-sale-badge {
+  animation: bidals-sale-badge 700ms ease-out 780ms both;
+  align-self: start;
+  background: var(--ink);
+  border: 1px solid rgba(206, 251, 4, 0.32);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(23, 33, 30, 0.12);
+  color: var(--brand-green);
+  font-size: 0.78rem;
+  font-weight: 800;
+  justify-self: end;
+  padding: 6px 10px;
+}
+
+@keyframes bidals-progress-grow {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 51%;
+  }
+}
+
+@keyframes bidals-sale-badge {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .seller-metric-list,
 .activity-list {
   display: grid;
@@ -1910,9 +2006,15 @@ p {
   .preview-bid-button,
   .quick-action,
   .card-quick-actions,
+  .auction-progress-fill,
+  .latest-sale-badge,
   .live-dot {
     animation: none;
     transition: none;
+  }
+
+  .auction-progress-fill {
+    width: 51%;
   }
 
   .hero-lot-card:hover,
@@ -1922,6 +2024,7 @@ p {
   .auction-preview-card:hover .media-art,
   .auction-preview-card:hover .media-image,
   .hero-lot-card:hover .preview-bid-button,
+  .latest-sale-badge,
   .quick-action:hover {
     transform: none;
   }
@@ -2000,6 +2103,16 @@ p {
   .landing-section,
   .landing-final-cta {
     padding: 58px 0;
+  }
+
+  .auction-progress-header {
+    display: grid;
+  }
+
+  .auction-progress-header small,
+  .latest-sale-badge {
+    justify-self: start;
+    text-align: left;
   }
 
   .landing-footer-inner {

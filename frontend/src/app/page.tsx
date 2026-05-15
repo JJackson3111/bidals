@@ -380,6 +380,19 @@ export default function LandingPage() {
                 </div>
                 <h3>Live analytics</h3>
               </div>
+              <div className="auction-progress-module" aria-label="Auction progress">
+                <div className="auction-progress-header">
+                  <div>
+                    <span>Auction progress</span>
+                    <strong>£10,525 raised</strong>
+                  </div>
+                  <small>51% of £20,000 goal</small>
+                </div>
+                <div className="auction-progress-track" aria-hidden="true">
+                  <span className="auction-progress-fill" />
+                </div>
+                <div className="latest-sale-badge">+£500 latest sale</div>
+              </div>
               <div className="seller-metric-list">
                 <div>
                   <span>Total bids</span>
