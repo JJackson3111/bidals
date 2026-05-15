@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  DollarSign,
   Eye,
   Gavel,
   ImagePlus,
@@ -20,6 +21,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 const trustFeatures = [
   {
@@ -39,31 +41,44 @@ const trustFeatures = [
   },
 ];
 
-const launchSteps = [
+type LaunchStep = {
+  number: string;
+  title: string;
+  description: string;
+  cue: LucideIcon;
+  cueKind: "calendar" | "images" | "radio" | "close";
+  altCue?: LucideIcon;
+};
+
+const launchSteps: LaunchStep[] = [
   {
     number: "1",
     title: "Create auction",
     description: "Set the title, schedule, status, and seller-owned auction details.",
     cue: CalendarPlus,
+    cueKind: "calendar",
   },
   {
     number: "2",
     title: "Add lots",
     description: "Prepare items with images, descriptions, starting prices, and bid increments.",
     cue: ImagePlus,
+    cueKind: "images",
   },
   {
     number: "3",
     title: "Open bidding",
     description: "Share the auction feed and let bidders participate from any device.",
     cue: RadioTower,
-    live: true,
+    cueKind: "radio",
   },
   {
     number: "4",
     title: "Close with confidence",
     description: "Use backend-owned outcomes, audit logs, and fulfillment tracking after the auction.",
     cue: CheckCircle2,
+    cueKind: "close",
+    altCue: DollarSign,
   },
 ];
 
@@ -317,12 +332,28 @@ export default function LandingPage() {
           <div className="landing-steps-grid">
             {launchSteps.map((step, index) => {
               const CueIcon = step.cue;
+              const AltCue = step.altCue;
               return (
                 <article className="landing-step" key={step.title}>
                   <div className="landing-step-number">{step.number}</div>
-                  <div className="landing-step-cue">
-                    <CueIcon size={17} strokeWidth={1.9} aria-hidden="true" />
-                    {step.live ? <span aria-hidden="true" /> : null}
+                  <div className={`landing-step-cue cue-${step.cueKind}`}>
+                    <CueIcon className="cue-icon cue-primary" size={22} strokeWidth={1.9} aria-hidden="true" />
+                    {AltCue ? <AltCue className="cue-icon cue-secondary" size={22} strokeWidth={1.9} aria-hidden="true" /> : null}
+                    {step.cueKind === "calendar" ? <span className="cue-plus-marker" aria-hidden="true" /> : null}
+                    {step.cueKind === "images" ? (
+                      <span className="cue-image-flow" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    ) : null}
+                    {step.cueKind === "radio" ? (
+                      <>
+                        <span className="cue-signal cue-signal-left" aria-hidden="true" />
+                        <span className="cue-signal cue-signal-right" aria-hidden="true" />
+                        <span className="cue-live-dot" aria-hidden="true" />
+                      </>
+                    ) : null}
                   </div>
                   <h3>{step.title}</h3>
                   <p>{step.description}</p>
