@@ -946,7 +946,9 @@ p {
 
 .cue-calendar .cue-primary path:nth-last-child(-n + 2) {
   animation: bidals-cue-calendar-plus 3.2s ease-in-out infinite;
+  opacity: 1;
   stroke: var(--brand-green);
+  stroke-width: 2.2px;
 }
 
 .cue-image-flow {
@@ -1095,13 +1097,13 @@ p {
 @keyframes bidals-cue-calendar-plus {
   0%,
   100% {
-    opacity: 0.84;
-    filter: drop-shadow(0 0 0 rgba(206, 251, 4, 0));
+    opacity: 1;
+    filter: drop-shadow(0 0 1px rgba(206, 251, 4, 0.18));
   }
 
   45% {
     opacity: 1;
-    filter: drop-shadow(0 0 5px rgba(206, 251, 4, 0.34));
+    filter: drop-shadow(0 0 4px rgba(206, 251, 4, 0.42));
   }
 }
 
