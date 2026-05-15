@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -53,6 +54,7 @@ const heroLots = [
     activity: "3 bids in last hour",
     reserve: "Reserve met",
     mediaCount: "1/4",
+    image: "/demo-lots/vintage-camera.jpg",
     variant: "camera",
   },
   {
@@ -65,6 +67,7 @@ const heroLots = [
     activity: "7 bids in last hour",
     reserve: "Verified seller",
     mediaCount: "1/6",
+    image: "/demo-lots/designer-watch.jpg",
     variant: "watch",
   },
 ];
@@ -80,6 +83,7 @@ const liveLots = [
     activity: "4 bids in last hour",
     reserve: "Reserve met",
     mediaCount: "1/5",
+    image: "/demo-lots/art-print.jpg",
     variant: "art",
   },
   {
@@ -92,6 +96,7 @@ const liveLots = [
     activity: "9 bids in last hour",
     reserve: "Reserve met",
     mediaCount: "1/4",
+    image: "/demo-lots/wine-selection.jpg",
     variant: "wine",
   },
   {
@@ -104,6 +109,7 @@ const liveLots = [
     activity: "5 bids in last hour",
     reserve: "Verified seller",
     mediaCount: "1/6",
+    image: "/demo-lots/travel-package.jpg",
     variant: "travel",
   },
   {
@@ -116,6 +122,7 @@ const liveLots = [
     activity: "11 bids in last hour",
     reserve: "Reserve met",
     mediaCount: "1/3",
+    image: "/demo-lots/sports-memorabilia.jpg",
     variant: "sports",
   },
   {
@@ -128,6 +135,7 @@ const liveLots = [
     activity: "2 bids in last hour",
     reserve: "Verified seller",
     mediaCount: "1/5",
+    image: "/demo-lots/tech-bundle.jpg",
     variant: "tech",
   },
   {
@@ -140,6 +148,7 @@ const liveLots = [
     activity: "6 bids in last hour",
     reserve: "Reserve met",
     mediaCount: "1/4",
+    image: "/demo-lots/designer-furniture.jpg",
     variant: "furniture",
   },
 ];
@@ -151,10 +160,11 @@ const activityItems = [
   { icon: Package, text: "New lot added to auction", time: "12m ago" },
 ];
 
-function MediaPanel({ count, label, variant }: { count: string; label: string; variant: string }) {
+function MediaPanel({ count, image, label, variant }: { count: string; image: string; label: string; variant: string }) {
   return (
     <>
       <div className={`media-art media-art-${variant}`} />
+      <Image className="media-image" src={image} alt="" fill sizes="(min-width: 720px) 480px, 100vw" />
       <div className="media-overlay" />
       <span className="media-count">{count}</span>
       <span className="media-label">{label}</span>
@@ -212,7 +222,7 @@ export default function LandingPage() {
             {heroLots.map((lot) => (
               <article className="hero-lot-card" key={lot.name}>
                 <div className="hero-lot-media media-panel">
-                  <MediaPanel count={lot.mediaCount} label={lot.name} variant={lot.variant} />
+                  <MediaPanel count={lot.mediaCount} image={lot.image} label={lot.name} variant={lot.variant} />
                 </div>
                 <div className="hero-lot-body">
                   <div className="card-title-row">
@@ -303,7 +313,7 @@ export default function LandingPage() {
             {liveLots.map((item) => (
               <article className="auction-preview-card" key={item.name}>
                 <div className="auction-preview-media media-panel">
-                  <MediaPanel count={item.mediaCount} label={item.name} variant={item.variant} />
+                  <MediaPanel count={item.mediaCount} image={item.image} label={item.name} variant={item.variant} />
                 </div>
                 <div className="auction-preview-body">
                   <div className="card-title-row">

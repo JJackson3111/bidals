@@ -431,6 +431,7 @@ p {
 }
 
 .media-art,
+.media-image,
 .media-overlay {
   inset: 0;
   position: absolute;
@@ -438,76 +439,86 @@ p {
 
 .media-art {
   background:
-    radial-gradient(circle at 26% 22%, rgba(255, 255, 255, 0.72), transparent 18%),
-    radial-gradient(circle at 70% 72%, rgba(206, 251, 4, 0.38), transparent 24%),
-    linear-gradient(135deg, #dfe5df, #f7faf7);
+    radial-gradient(circle at 26% 22%, rgba(255, 255, 255, 0.16), transparent 18%),
+    radial-gradient(circle at 72% 70%, rgba(206, 251, 4, 0.16), transparent 22%),
+    linear-gradient(135deg, #101614, #39443f);
   transform: scale(1);
   transition: transform 240ms ease;
   z-index: 0;
 }
 
+.media-image {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1);
+  transition: transform 240ms ease;
+  width: 100%;
+  z-index: 1;
+}
+
 .media-art-camera {
   background:
-    radial-gradient(circle at 42% 44%, #17211e 0 13%, transparent 14%),
-    radial-gradient(circle at 42% 44%, rgba(206, 251, 4, 0.78) 0 20%, transparent 21%),
-    linear-gradient(135deg, #ced7d2 0%, #f9fbf7 55%, #cdd9d0 100%);
+    radial-gradient(circle at 42% 44%, rgba(255, 255, 255, 0.12) 0 13%, transparent 14%),
+    radial-gradient(circle at 42% 44%, rgba(206, 251, 4, 0.22) 0 20%, transparent 21%),
+    linear-gradient(135deg, #111816 0%, #3b4541 100%);
 }
 
 .media-art-watch {
   background:
-    radial-gradient(circle at 52% 48%, #17211e 0 15%, transparent 16%),
-    radial-gradient(circle at 52% 48%, rgba(206, 251, 4, 0.62) 0 26%, transparent 27%),
-    linear-gradient(145deg, #eef2ee 0%, #cfd9d2 48%, #fbfcf9 100%);
+    radial-gradient(circle at 52% 48%, rgba(255, 255, 255, 0.14) 0 15%, transparent 16%),
+    radial-gradient(circle at 52% 48%, rgba(206, 251, 4, 0.2) 0 26%, transparent 27%),
+    linear-gradient(145deg, #111816 0%, #46504b 100%);
 }
 
 .media-art-art {
   background:
-    linear-gradient(135deg, transparent 0 42%, rgba(206, 251, 4, 0.34) 43% 56%, transparent 57%),
-    linear-gradient(160deg, #f9faf7 0%, #d9e1dc 46%, #eef4e7 100%);
+    linear-gradient(135deg, transparent 0 42%, rgba(206, 251, 4, 0.16) 43% 56%, transparent 57%),
+    linear-gradient(160deg, #141b19 0%, #46504b 100%);
 }
 
 .media-art-wine {
   background:
-    radial-gradient(circle at 48% 33%, rgba(23, 33, 30, 0.88) 0 9%, transparent 10%),
-    linear-gradient(90deg, transparent 42%, rgba(23, 33, 30, 0.18) 43% 56%, transparent 57%),
-    linear-gradient(145deg, #e9eee9, rgba(206, 251, 4, 0.22));
+    radial-gradient(circle at 48% 33%, rgba(255, 255, 255, 0.14) 0 9%, transparent 10%),
+    linear-gradient(90deg, transparent 42%, rgba(255, 255, 255, 0.1) 43% 56%, transparent 57%),
+    linear-gradient(145deg, #111816, #3d4943);
 }
 
 .media-art-travel {
   background:
-    linear-gradient(140deg, rgba(206, 251, 4, 0.38) 0 28%, transparent 29%),
-    radial-gradient(circle at 72% 26%, rgba(255, 255, 255, 0.86), transparent 16%),
-    linear-gradient(150deg, #dce5df, #f9fbf8);
+    linear-gradient(140deg, rgba(206, 251, 4, 0.18) 0 28%, transparent 29%),
+    radial-gradient(circle at 72% 26%, rgba(255, 255, 255, 0.18), transparent 16%),
+    linear-gradient(150deg, #111816, #45504b);
 }
 
 .media-art-sports {
   background:
-    repeating-linear-gradient(35deg, rgba(23, 33, 30, 0.08) 0 8px, transparent 8px 18px),
-    radial-gradient(circle at 58% 52%, rgba(206, 251, 4, 0.44), transparent 20%),
-    linear-gradient(145deg, #eef2ee, #d8e1dc);
+    repeating-linear-gradient(35deg, rgba(255, 255, 255, 0.08) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 58% 52%, rgba(206, 251, 4, 0.18), transparent 20%),
+    linear-gradient(145deg, #121917, #3b4541);
 }
 
 .media-art-tech {
   background:
-    linear-gradient(90deg, rgba(23, 33, 30, 0.12) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(23, 33, 30, 0.1) 1px, transparent 1px),
-    radial-gradient(circle at 70% 30%, rgba(206, 251, 4, 0.42), transparent 22%),
-    #f3f6f2;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 70% 30%, rgba(206, 251, 4, 0.18), transparent 22%),
+    #151d1a;
   background-size: 24px 24px, 24px 24px, auto, auto;
 }
 
 .media-art-furniture {
   background:
-    linear-gradient(90deg, transparent 0 18%, rgba(23, 33, 30, 0.12) 19% 22%, transparent 23%),
-    radial-gradient(circle at 58% 64%, rgba(206, 251, 4, 0.32), transparent 22%),
-    linear-gradient(145deg, #eef3ef, #d7e0da);
+    linear-gradient(90deg, transparent 0 18%, rgba(255, 255, 255, 0.1) 19% 22%, transparent 23%),
+    radial-gradient(circle at 58% 64%, rgba(206, 251, 4, 0.14), transparent 22%),
+    linear-gradient(145deg, #111816, #414c47);
 }
 
 .media-overlay {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(23, 33, 30, 0.12)),
-    linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.3) 100%);
-  z-index: 1;
+    linear-gradient(180deg, rgba(23, 33, 30, 0.08), rgba(23, 33, 30, 0.28)),
+    linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.12) 100%);
+  z-index: 2;
 }
 
 .media-count,
@@ -515,7 +526,7 @@ p {
 .media-nav-hint,
 .media-dots {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
 }
 
 .media-count {
@@ -531,11 +542,11 @@ p {
 }
 
 .media-label {
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(23, 33, 30, 0.08);
+  background: rgba(23, 33, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   bottom: 13px;
-  color: #39423e;
+  color: #fff;
   font-size: 0.78rem;
   font-weight: 800;
   left: 12px;
@@ -718,7 +729,9 @@ p {
   }
 
   .hero-lot-card:hover .media-art,
-  .auction-preview-card:hover .media-art {
+  .hero-lot-card:hover .media-image,
+  .auction-preview-card:hover .media-art,
+  .auction-preview-card:hover .media-image {
     transform: scale(1.045);
   }
 
@@ -1893,6 +1906,7 @@ p {
   .hero-lot-card,
   .auction-preview-card,
   .media-art,
+  .media-image,
   .preview-bid-button,
   .quick-action,
   .card-quick-actions,
@@ -1904,7 +1918,9 @@ p {
   .hero-lot-card:hover,
   .auction-preview-card:hover,
   .hero-lot-card:hover .media-art,
+  .hero-lot-card:hover .media-image,
   .auction-preview-card:hover .media-art,
+  .auction-preview-card:hover .media-image,
   .hero-lot-card:hover .preview-bid-button,
   .quick-action:hover {
     transform: none;
