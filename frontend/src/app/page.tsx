@@ -1,5 +1,21 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, Bell, CheckCircle2, Clock, Package, Shield, TrendingUp, Users, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  Bell,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Eye,
+  Gavel,
+  Package,
+  Shield,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react";
 
 const trustFeatures = [
   {
@@ -26,13 +42,106 @@ const launchSteps = [
   ["4", "Close with confidence", "Use backend-owned outcomes, audit logs, and fulfillment tracking after the auction."],
 ];
 
+const heroLots = [
+  {
+    name: "Vintage Camera Collection",
+    bid: "$2,450",
+    time: "2h 34m",
+    status: "Live",
+    bidders: "12 bidders",
+    watchers: "34 watching",
+    activity: "3 bids in last hour",
+    reserve: "Reserve met",
+    mediaCount: "1/4",
+    variant: "camera",
+  },
+  {
+    name: "Designer Watch Set",
+    bid: "$8,200",
+    time: "5h 12m",
+    status: "Trending",
+    bidders: "28 bidders",
+    watchers: "91 watching",
+    activity: "7 bids in last hour",
+    reserve: "Verified seller",
+    mediaCount: "1/6",
+    variant: "watch",
+  },
+];
+
 const liveLots = [
-  { name: "Art Nouveau Print Collection", bid: "$1,850", time: "3h 45m", status: "Active" },
-  { name: "Premium Wine Selection", bid: "$4,200", time: "1h 12m", status: "Ending soon" },
-  { name: "Luxury Travel Package", bid: "$6,500", time: "6h 30m", status: "Active" },
-  { name: "Signed Sports Memorabilia", bid: "$3,100", time: "45m", status: "Ending soon" },
-  { name: "Tech Bundle Pro", bid: "$2,900", time: "4h 20m", status: "Active" },
-  { name: "Designer Furniture Set", bid: "$5,750", time: "2h 55m", status: "Active" },
+  {
+    name: "Art Nouveau Print Collection",
+    bid: "$1,850",
+    time: "3h 45m",
+    status: "Active",
+    bidders: "14 bidders",
+    watchers: "41 watching",
+    activity: "4 bids in last hour",
+    reserve: "Reserve met",
+    mediaCount: "1/5",
+    variant: "art",
+  },
+  {
+    name: "Premium Wine Selection",
+    bid: "$4,200",
+    time: "1h 12m",
+    status: "Ending soon",
+    bidders: "22 bidders",
+    watchers: "68 watching",
+    activity: "9 bids in last hour",
+    reserve: "Reserve met",
+    mediaCount: "1/4",
+    variant: "wine",
+  },
+  {
+    name: "Luxury Travel Package",
+    bid: "$6,500",
+    time: "6h 30m",
+    status: "Trending",
+    bidders: "19 bidders",
+    watchers: "77 watching",
+    activity: "5 bids in last hour",
+    reserve: "Verified seller",
+    mediaCount: "1/6",
+    variant: "travel",
+  },
+  {
+    name: "Signed Sports Memorabilia",
+    bid: "$3,100",
+    time: "45m",
+    status: "Ending soon",
+    bidders: "31 bidders",
+    watchers: "112 watching",
+    activity: "11 bids in last hour",
+    reserve: "Reserve met",
+    mediaCount: "1/3",
+    variant: "sports",
+  },
+  {
+    name: "Tech Bundle Pro",
+    bid: "$2,900",
+    time: "4h 20m",
+    status: "Active",
+    bidders: "17 bidders",
+    watchers: "55 watching",
+    activity: "2 bids in last hour",
+    reserve: "Verified seller",
+    mediaCount: "1/5",
+    variant: "tech",
+  },
+  {
+    name: "Designer Furniture Set",
+    bid: "$5,750",
+    time: "2h 55m",
+    status: "Active",
+    bidders: "24 bidders",
+    watchers: "83 watching",
+    activity: "6 bids in last hour",
+    reserve: "Reserve met",
+    mediaCount: "1/4",
+    variant: "furniture",
+  },
 ];
 
 const activityItems = [
@@ -41,6 +150,40 @@ const activityItems = [
   { icon: TrendingUp, text: "Bid increased on Watch Set", time: "8m ago" },
   { icon: Package, text: "New lot added to auction", time: "12m ago" },
 ];
+
+function MediaPanel({ count, label, variant }: { count: string; label: string; variant: string }) {
+  return (
+    <>
+      <div className={`media-art media-art-${variant}`} />
+      <div className="media-overlay" />
+      <span className="media-count">{count}</span>
+      <span className="media-label">{label}</span>
+      <div className="media-nav-hint" aria-hidden="true">
+        <span>
+          <ChevronLeft size={14} />
+        </span>
+        <span>
+          <ChevronRight size={14} />
+        </span>
+      </div>
+      <div className="media-dots" aria-hidden="true">
+        <span className="active" />
+        <span />
+        <span />
+      </div>
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const statusClass = status === "Ending soon" ? "ending" : status === "Trending" ? "trending" : "";
+  return (
+    <span className={`status-chip ${statusClass}`}>
+      <span className="live-dot" aria-hidden="true" />
+      {status}
+    </span>
+  );
+}
 
 export default function LandingPage() {
   return (
@@ -66,41 +209,48 @@ export default function LandingPage() {
           </div>
 
           <div className="landing-hero-preview" aria-hidden="true">
-            <article className="hero-lot-card">
-              <div className="hero-lot-media">Premium Item</div>
-              <div className="hero-lot-body">
-                <h2>Vintage Camera Collection</h2>
-                <div className="hero-lot-meta">
-                  <div>
-                    <span>Current bid</span>
-                    <strong>$2,450</strong>
-                  </div>
-                  <div className="hero-lot-time">
-                    <Clock size={16} aria-hidden="true" />
-                    <span>2h 34m</span>
-                  </div>
+            {heroLots.map((lot) => (
+              <article className="hero-lot-card" key={lot.name}>
+                <div className="hero-lot-media media-panel">
+                  <MediaPanel count={lot.mediaCount} label={lot.name} variant={lot.variant} />
                 </div>
-                <div className="preview-bid-button">Place bid</div>
-              </div>
-            </article>
-
-            <article className="hero-lot-card hero-lot-card-secondary">
-              <div className="hero-lot-media">Premium Item</div>
-              <div className="hero-lot-body">
-                <h2>Designer Watch Set</h2>
-                <div className="hero-lot-meta">
-                  <div>
-                    <span>Current bid</span>
-                    <strong>$8,200</strong>
+                <div className="hero-lot-body">
+                  <div className="card-title-row">
+                    <h2>{lot.name}</h2>
+                    <StatusBadge status={lot.status} />
                   </div>
-                  <div className="hero-lot-time">
-                    <Clock size={16} aria-hidden="true" />
-                    <span>5h 12m</span>
+                  <div className="hero-lot-meta">
+                    <div>
+                      <span>Current bid</span>
+                      <strong>{lot.bid}</strong>
+                    </div>
+                    <div className="hero-lot-time">
+                      <Clock size={16} aria-hidden="true" />
+                      <span>{lot.time}</span>
+                    </div>
                   </div>
+                  <div className="lot-signal-grid">
+                    <span>
+                      <Users size={14} aria-hidden="true" />
+                      {lot.bidders}
+                    </span>
+                    <span>
+                      <Eye size={14} aria-hidden="true" />
+                      {lot.watchers}
+                    </span>
+                    <span>
+                      <TrendingUp size={14} aria-hidden="true" />
+                      {lot.activity}
+                    </span>
+                    <span>
+                      <BadgeCheck size={14} aria-hidden="true" />
+                      {lot.reserve}
+                    </span>
+                  </div>
+                  <div className="preview-bid-button">Place bid</div>
                 </div>
-                <div className="preview-bid-button">Place bid</div>
-              </div>
-            </article>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -152,11 +302,13 @@ export default function LandingPage() {
           <div className="landing-live-grid">
             {liveLots.map((item) => (
               <article className="auction-preview-card" key={item.name}>
-                <div className="auction-preview-media">Item</div>
+                <div className="auction-preview-media media-panel">
+                  <MediaPanel count={item.mediaCount} label={item.name} variant={item.variant} />
+                </div>
                 <div className="auction-preview-body">
-                  <div>
+                  <div className="card-title-row">
                     <h3>{item.name}</h3>
-                    <span className={`status-chip ${item.status === "Ending soon" ? "ending" : ""}`}>{item.status}</span>
+                    <StatusBadge status={item.status} />
                   </div>
                   <div className="auction-preview-footer">
                     <div>
@@ -167,6 +319,35 @@ export default function LandingPage() {
                       <Clock size={14} aria-hidden="true" />
                       <span>{item.time}</span>
                     </div>
+                  </div>
+                  <div className="lot-signal-grid compact">
+                    <span>
+                      <Users size={13} aria-hidden="true" />
+                      {item.bidders}
+                    </span>
+                    <span>
+                      <Eye size={13} aria-hidden="true" />
+                      {item.watchers}
+                    </span>
+                    <span>
+                      <Gavel size={13} aria-hidden="true" />
+                      {item.activity}
+                    </span>
+                    <span>
+                      <BadgeCheck size={13} aria-hidden="true" />
+                      {item.reserve}
+                    </span>
+                  </div>
+                  <div className="card-quick-actions" aria-label={`Quick actions for ${item.name}`}>
+                    <Link href="/auctions" className="quick-action">
+                      Watch
+                    </Link>
+                    <Link href="/auctions" className="quick-action">
+                      Preview
+                    </Link>
+                    <Link href="/auctions" className="quick-action primary">
+                      Quick bid
+                    </Link>
                   </div>
                 </div>
               </article>
