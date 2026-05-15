@@ -944,35 +944,9 @@ p {
   position: absolute;
 }
 
-.cue-plus-marker {
-  animation: bidals-cue-plus 2.8s ease-in-out infinite;
-  height: 12px;
-  position: absolute;
-  right: 11px;
-  top: 3px;
-  width: 12px;
-  z-index: 3;
-}
-
-.cue-plus-marker::before,
-.cue-plus-marker::after {
-  background: var(--brand-green);
-  border-radius: 999px;
-  content: "";
-  left: 50%;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.cue-plus-marker::before {
-  height: 2px;
-  width: 10px;
-}
-
-.cue-plus-marker::after {
-  height: 10px;
-  width: 2px;
+.cue-calendar .cue-primary path:nth-last-child(-n + 2) {
+  animation: bidals-cue-calendar-plus 3.2s ease-in-out infinite;
+  stroke: var(--brand-green);
 }
 
 .cue-image-flow {
@@ -1118,18 +1092,16 @@ p {
   }
 }
 
-@keyframes bidals-cue-plus {
+@keyframes bidals-cue-calendar-plus {
   0%,
   100% {
-    opacity: 0.78;
+    opacity: 0.84;
     filter: drop-shadow(0 0 0 rgba(206, 251, 4, 0));
-    transform: scale(1);
   }
 
   45% {
     opacity: 1;
-    filter: drop-shadow(0 0 7px rgba(206, 251, 4, 0.38));
-    transform: scale(1.08);
+    filter: drop-shadow(0 0 5px rgba(206, 251, 4, 0.34));
   }
 }
 
@@ -2357,7 +2329,7 @@ p {
   .landing-step-number,
   .landing-step-cue,
   .landing-step-cue span,
-  .cue-plus-marker,
+  .cue-calendar .cue-primary path:nth-last-child(-n + 2),
   .cue-image-flow i,
   .cue-signal,
   .cue-primary,
@@ -2385,11 +2357,15 @@ p {
     color: var(--ink);
   }
 
-  .cue-plus-marker,
   .cue-signal,
   .cue-live-dot {
     filter: none;
     opacity: 0.72;
+  }
+
+  .cue-calendar .cue-primary path:nth-last-child(-n + 2) {
+    filter: none;
+    opacity: 1;
   }
 
   .cue-image-flow i {
@@ -2421,7 +2397,6 @@ p {
   .auction-preview-card:hover .media-image,
   .hero-lot-card:hover .preview-bid-button,
   .latest-sale-badge,
-  .cue-plus-marker,
   .cue-image-flow i,
   .cue-signal,
   .cue-primary,

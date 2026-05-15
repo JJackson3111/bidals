@@ -339,7 +339,6 @@ export default function LandingPage() {
                   <div className={`landing-step-cue cue-${step.cueKind}`}>
                     <CueIcon className="cue-icon cue-primary" size={22} strokeWidth={1.9} aria-hidden="true" />
                     {AltCue ? <AltCue className="cue-icon cue-secondary" size={22} strokeWidth={1.9} aria-hidden="true" /> : null}
-                    {step.cueKind === "calendar" ? <span className="cue-plus-marker" aria-hidden="true" /> : null}
                     {step.cueKind === "images" ? (
                       <span className="cue-image-flow" aria-hidden="true">
                         <i />
