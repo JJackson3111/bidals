@@ -858,21 +858,85 @@ p {
 .landing-steps-grid {
   display: grid;
   gap: 18px;
+  position: relative;
 }
 
 .landing-step {
+  animation: bidals-step-focus 7.6s ease-in-out infinite;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   justify-items: center;
+  opacity: 0.74;
   position: relative;
   text-align: center;
 }
 
+.landing-step:nth-child(2) {
+  animation-delay: 1.4s;
+}
+
+.landing-step:nth-child(3) {
+  animation-delay: 2.8s;
+}
+
+.landing-step:nth-child(4) {
+  animation-delay: 4.2s;
+}
+
 .landing-step-number {
+  animation: bidals-step-number 7.6s ease-in-out infinite;
+  background: rgba(255, 255, 255, 0.76);
+  border-color: rgba(23, 33, 30, 0.12);
+  color: var(--ink);
   font-size: 1.4rem;
   font-weight: 800;
   height: 58px;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
   width: 58px;
+}
+
+.landing-step:nth-child(2) .landing-step-number {
+  animation-delay: 1.4s;
+}
+
+.landing-step:nth-child(3) .landing-step-number {
+  animation-delay: 2.8s;
+}
+
+.landing-step:nth-child(4) .landing-step-number {
+  animation-delay: 4.2s;
+}
+
+.landing-step-cue {
+  align-items: center;
+  animation: bidals-step-cue 7.6s ease-in-out infinite;
+  color: #65736e;
+  display: inline-flex;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.landing-step:nth-child(2) .landing-step-cue {
+  animation-delay: 1.4s;
+}
+
+.landing-step:nth-child(3) .landing-step-cue {
+  animation-delay: 2.8s;
+}
+
+.landing-step:nth-child(4) .landing-step-cue {
+  animation-delay: 4.2s;
+}
+
+.landing-step-cue span {
+  animation: bidals-live-pulse 1.8s ease-in-out infinite;
+  background: var(--brand-green);
+  border-radius: 999px;
+  height: 6px;
+  width: 6px;
 }
 
 .landing-step p {
@@ -881,6 +945,81 @@ p {
 
 .landing-step-line {
   display: none;
+  overflow: hidden;
+  position: relative;
+}
+
+.landing-step-line::after {
+  animation: bidals-step-line 7.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  background: var(--brand-green);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.landing-step:nth-child(2) .landing-step-line::after {
+  animation-delay: 1.4s;
+}
+
+.landing-step:nth-child(3) .landing-step-line::after {
+  animation-delay: 2.8s;
+}
+
+@keyframes bidals-step-focus {
+  0%,
+  18%,
+  100% {
+    opacity: 0.74;
+  }
+
+  7%,
+  14% {
+    opacity: 1;
+  }
+}
+
+@keyframes bidals-step-number {
+  0%,
+  18%,
+  100% {
+    background: rgba(255, 255, 255, 0.76);
+    border-color: rgba(23, 33, 30, 0.12);
+    transform: translateY(0);
+  }
+
+  7%,
+  14% {
+    background: rgba(206, 251, 4, 0.28);
+    border-color: rgba(206, 251, 4, 0.54);
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes bidals-step-cue {
+  0%,
+  18%,
+  100% {
+    color: #65736e;
+  }
+
+  7%,
+  14% {
+    color: var(--ink);
+  }
+}
+
+@keyframes bidals-step-line {
+  0%,
+  8% {
+    transform: scaleX(0);
+  }
+
+  18%,
+  100% {
+    transform: scaleX(1);
+  }
 }
 
 .auction-preview-card {
@@ -2027,6 +2166,11 @@ p {
   .card-quick-actions,
   .auction-progress-fill,
   .latest-sale-badge,
+  .landing-step,
+  .landing-step-number,
+  .landing-step-cue,
+  .landing-step-cue span,
+  .landing-step-line::after,
   .live-dot {
     animation: none;
     transition: none;
@@ -2034,6 +2178,23 @@ p {
 
   .auction-progress-fill {
     width: 51%;
+  }
+
+  .landing-step {
+    opacity: 1;
+  }
+
+  .landing-step-number {
+    background: rgba(206, 251, 4, 0.22);
+    border-color: rgba(206, 251, 4, 0.42);
+  }
+
+  .landing-step-cue {
+    color: var(--ink);
+  }
+
+  .landing-step-line::after {
+    transform: scaleX(1);
   }
 
   .hero-lot-card:hover,
@@ -2243,6 +2404,7 @@ p {
 
   .landing-step-line {
     background: var(--line);
+    border-radius: 999px;
     display: block;
     height: 1px;
     left: 62%;

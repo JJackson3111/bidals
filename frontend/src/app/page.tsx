@@ -5,13 +5,16 @@ import {
   BadgeCheck,
   BarChart3,
   Bell,
+  CalendarPlus,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
   Eye,
   Gavel,
+  ImagePlus,
   Package,
+  RadioTower,
   Shield,
   TrendingUp,
   Users,
@@ -37,10 +40,31 @@ const trustFeatures = [
 ];
 
 const launchSteps = [
-  ["1", "Create auction", "Set the title, schedule, status, and seller-owned auction details."],
-  ["2", "Add lots", "Prepare items with images, descriptions, starting prices, and bid increments."],
-  ["3", "Open bidding", "Share the auction feed and let bidders participate from any device."],
-  ["4", "Close with confidence", "Use backend-owned outcomes, audit logs, and fulfillment tracking after the auction."],
+  {
+    number: "1",
+    title: "Create auction",
+    description: "Set the title, schedule, status, and seller-owned auction details.",
+    cue: CalendarPlus,
+  },
+  {
+    number: "2",
+    title: "Add lots",
+    description: "Prepare items with images, descriptions, starting prices, and bid increments.",
+    cue: ImagePlus,
+  },
+  {
+    number: "3",
+    title: "Open bidding",
+    description: "Share the auction feed and let bidders participate from any device.",
+    cue: RadioTower,
+    live: true,
+  },
+  {
+    number: "4",
+    title: "Close with confidence",
+    description: "Use backend-owned outcomes, audit logs, and fulfillment tracking after the auction.",
+    cue: CheckCircle2,
+  },
 ];
 
 const heroLots = [
@@ -291,14 +315,21 @@ export default function LandingPage() {
             <p>From creation to completion in a clean, governed workflow.</p>
           </div>
           <div className="landing-steps-grid">
-            {launchSteps.map(([number, title, description], index) => (
-              <article className="landing-step" key={title}>
-                <div className="landing-step-number">{number}</div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-                {index < launchSteps.length - 1 ? <span className="landing-step-line" aria-hidden="true" /> : null}
-              </article>
-            ))}
+            {launchSteps.map((step, index) => {
+              const CueIcon = step.cue;
+              return (
+                <article className="landing-step" key={step.title}>
+                  <div className="landing-step-number">{step.number}</div>
+                  <div className="landing-step-cue">
+                    <CueIcon size={17} strokeWidth={1.9} aria-hidden="true" />
+                    {step.live ? <span aria-hidden="true" /> : null}
+                  </div>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                  {index < launchSteps.length - 1 ? <span className="landing-step-line" aria-hidden="true" /> : null}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
