@@ -841,7 +841,7 @@ p {
 
 .feature-icon-mark svg {
   display: block;
-  fill: rgba(206, 251, 4, 0.16);
+  fill: var(--brand-green);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
