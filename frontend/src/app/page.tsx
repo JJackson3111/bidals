@@ -337,13 +337,15 @@ export default function LandingPage() {
                 <article className="landing-step" key={step.title}>
                   <div className="landing-step-number">{step.number}</div>
                   <div className={`landing-step-cue cue-${step.cueKind}`}>
-                    <CueIcon className="cue-icon cue-primary" size={22} strokeWidth={1.9} aria-hidden="true" />
+                    {step.cueKind !== "images" ? (
+                      <CueIcon className="cue-icon cue-primary" size={22} strokeWidth={1.9} aria-hidden="true" />
+                    ) : null}
                     {AltCue ? <AltCue className="cue-icon cue-secondary" size={22} strokeWidth={1.9} aria-hidden="true" /> : null}
                     {step.cueKind === "images" ? (
                       <span className="cue-photo-stack" aria-hidden="true">
-                        <i />
-                        <i />
-                        <i />
+                        <i className="photo-card-one" />
+                        <i className="photo-card-two" />
+                        <i className="photo-card-three" />
                       </span>
                     ) : null}
                     {step.cueKind === "radio" ? (
