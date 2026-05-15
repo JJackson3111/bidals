@@ -806,13 +806,11 @@ p {
 
 .landing-feature-card {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   padding: 24px;
 }
 
-.landing-feature-card:hover .feature-icon-box {
-  border-color: rgba(23, 33, 30, 0.72);
-  box-shadow: 0 8px 18px rgba(23, 33, 30, 0.08);
+.landing-feature-card:hover .feature-icon-mark {
   transform: translateY(-1px);
 }
 
@@ -837,41 +835,30 @@ p {
   width: 46px;
 }
 
-.feature-icon-box {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 249, 244, 0.88)),
-    #f7faf4;
-  border: 1.5px solid rgba(23, 33, 30, 0.62);
-  border-radius: 16px;
-  box-shadow: 0 6px 14px rgba(23, 33, 30, 0.06);
+.feature-icon-mark {
+  align-items: flex-start;
   color: var(--ink);
-  height: 62px;
-  overflow: hidden;
-  position: relative;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-  width: 62px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 0 4px;
+  transition: transform 180ms ease;
+  width: fit-content;
 }
 
-.feature-icon-box::before {
-  background: var(--brand-green);
-  border-radius: 999px;
-  bottom: 9px;
-  content: "";
-  height: 4px;
-  left: 50%;
-  position: absolute;
-  transform: translateX(-50%);
-  width: 24px;
-}
-
-.feature-icon-box svg {
-  position: relative;
+.feature-icon-mark svg {
+  display: block;
   stroke-linecap: round;
   stroke-linejoin: round;
-  z-index: 2;
+}
+
+.feature-icon-mark span {
+  background: var(--brand-green);
+  border-radius: 999px;
+  display: block;
+  height: 4px;
+  margin-left: 1px;
+  width: 30px;
 }
 
 .landing-icon-box.compact {
