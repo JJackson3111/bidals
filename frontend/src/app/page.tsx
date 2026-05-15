@@ -273,8 +273,7 @@ export default function LandingPage() {
               return (
                 <article className="landing-feature-card" key={feature.title}>
                   <div className="feature-icon-mark">
-                    <Icon size={34} strokeWidth={2.7} aria-hidden="true" />
-                    <span aria-hidden="true" />
+                    <Icon size={30} strokeWidth={1.9} aria-hidden="true" />
                   </div>
                   <h2>{feature.title}</h2>
                   <p>{feature.description}</p>

@@ -806,12 +806,8 @@ p {
 
 .landing-feature-card {
   display: grid;
-  gap: 18px;
+  gap: 17px;
   padding: 24px;
-}
-
-.landing-feature-card:hover .feature-icon-mark {
-  transform: translateY(-1px);
 }
 
 .landing-feature-card p {
@@ -839,10 +835,7 @@ p {
   align-items: flex-start;
   color: var(--ink);
   display: inline-flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 2px 0 4px;
-  transition: transform 180ms ease;
+  padding: 4px 0 3px;
   width: fit-content;
 }
 
@@ -850,15 +843,6 @@ p {
   display: block;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.feature-icon-mark span {
-  background: var(--brand-green);
-  border-radius: 999px;
-  display: block;
-  height: 4px;
-  margin-left: 1px;
-  width: 30px;
 }
 
 .landing-icon-box.compact {
