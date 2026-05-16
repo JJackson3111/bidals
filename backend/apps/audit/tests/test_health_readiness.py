@@ -18,7 +18,7 @@ def test_root_and_api_health_endpoints_return_alive_status():
     assert api_response.json() == {"status": "ok", "service": "bidals-backend"}
 
 
-@override_settings(USE_REDIS_CACHE=False, SECRET_KEY="super-secret-readiness-test-key")
+@override_settings(USE_REDIS_CACHE=False, SECRET_KEY="test-secret")
 def test_readiness_endpoint_checks_database_and_does_not_leak_secrets():
     response = Client().get("/health/ready/")
 
@@ -27,7 +27,7 @@ def test_readiness_endpoint_checks_database_and_does_not_leak_secrets():
     assert payload["status"] == "ok"
     assert payload["service"] == "bidals-backend"
     assert payload["checks"] == {"database": "ok", "cache": "skipped"}
-    assert "super-secret-readiness-test-key" not in response.content.decode()
+    assert "test-secret" not in response.content.decode()
 
 
 @override_settings(USE_REDIS_CACHE=True)
