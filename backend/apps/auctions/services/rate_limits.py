@@ -5,6 +5,8 @@ import time
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.audit.security import parse_rate
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +23,16 @@ class BidRateLimitResult:
 
 def check_bid_rate_limit(request) -> BidRateLimitResult:
     user = request.user
+    if not getattr(settings, "ENABLE_RATE_LIMITING", True):
+        return BidRateLimitResult(
+            allowed=True,
+            limit=0,
+            remaining=0,
+            retry_after=0,
+            scope="disabled",
+            key="disabled",
+        )
+
     window_seconds = int(getattr(settings, "BID_RATE_LIMIT_WINDOW_SECONDS", 60))
 
     if user and user.is_authenticated:
@@ -31,6 +43,10 @@ def check_bid_rate_limit(request) -> BidRateLimitResult:
         scope = "anonymous"
         identifier = _client_ip(request)
         limit = int(getattr(settings, "BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS", 2))
+
+    configured_rate = getattr(settings, "RATE_LIMIT_BID_CREATE", "")
+    if configured_rate:
+        limit, window_seconds = parse_rate(configured_rate)
 
     now = time.time()
     bucket = int(now // window_seconds)

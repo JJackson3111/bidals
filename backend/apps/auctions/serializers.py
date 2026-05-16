@@ -38,6 +38,8 @@ class LotImageSerializer(serializers.ModelSerializer):
 
 
 class LotImageUploadSerializer(serializers.ModelSerializer):
+    ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
     class Meta:
         model = LotImage
         fields = ("image", "alt_text", "sort_order")
@@ -50,8 +52,8 @@ class LotImageUploadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Image file must be {max_size_mb}MB or smaller.")
 
         content_type = getattr(image, "content_type", "")
-        if content_type and not content_type.startswith("image/"):
-            raise serializers.ValidationError("Uploaded file must be an image.")
+        if content_type and content_type not in self.ALLOWED_IMAGE_CONTENT_TYPES:
+            raise serializers.ValidationError("Uploaded file must be a JPG, PNG, WebP, or GIF image.")
 
         return image
 

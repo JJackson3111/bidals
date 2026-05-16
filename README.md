@@ -1637,14 +1637,23 @@ If auction closing or winner calculation fails:
 
 - Set `DJANGO_DEBUG=False`.
 - Use a real `DJANGO_SECRET_KEY` from the provider's secret manager.
+- Production settings fail fast unless `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, database URL, and frontend/CORS/CSRF origins are configured.
 - Keep `SENTRY_DSN`, database URLs, Redis URLs, and object storage secrets in provider secret management.
 - Restrict `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`, and `DJANGO_CSRF_TRUSTED_ORIGINS`.
-- Keep HTTPS enabled and set secure cookies in production.
+- Keep HTTPS enabled and set secure cookies in production: `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, `SESSION_COOKIE_HTTPONLY=True`, and SameSite `Lax` or stricter where safe.
+- Keep `DJANGO_SECURE_HSTS_SECONDS`, `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`, and `DJANGO_SECURE_HSTS_PRELOAD` aligned with the deployed HTTPS posture.
+- Use `DJANGO_PERMISSIONS_POLICY` and staged `DJANGO_CONTENT_SECURITY_POLICY` / `DJANGO_CONTENT_SECURITY_POLICY_REPORT_ONLY` for secure headers.
+- JWT lifetimes are configurable through `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` and `JWT_REFRESH_TOKEN_LIFETIME_DAYS`; refresh rotation and blacklist remain enabled by default.
+- Security audit events include login success/failure, logout, token refresh, permission denied, rate-limit triggered, and bid rejection classification events.
+- Configure `ENABLE_RATE_LIMITING=True`, `RATE_LIMIT_LOGIN`, `RATE_LIMIT_REGISTRATION`, `RATE_LIMIT_BID_CREATE`, `RATE_LIMIT_PASSWORD_RESET`, and `RATE_LIMIT_ADMIN_ACTIONS`.
+- Leave `RATE_LIMIT_BID_CREATE` blank to keep using `BID_RATE_LIMIT_AUTHENTICATED_ATTEMPTS`, `BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS`, and `BID_RATE_LIMIT_WINDOW_SECONDS`; set it only if you want one unified bid-create rate such as `10/minute`.
+- Run `python scripts/security_secrets_check.py` before releases to catch obvious committed secrets.
 - Do not commit `.env` or cloud secrets to GitHub.
 - Keep bid endpoint rate limits enabled and tune them for real auction traffic.
 - Enable automated database backups.
 - Retain audit logs according to business and legal requirements.
 - Use separate staging and production environments.
+- See `docs/security-phase-1.md` and `docs/security-runbook.md` for the Secure Startup Platform baseline.
 
 ## Operational Notes
 
@@ -1673,6 +1682,7 @@ If auction closing or winner calculation fails:
 - The operations dashboard is intentionally lightweight; full analytics, alert routing, and notification delivery are deferred.
 - Auction ending uses management commands suitable for cron/provider schedulers; Celery Beat is still deferred.
 - Rate limiting uses Django cache; production should set `USE_REDIS_CACHE=True` so all instances share Redis-backed counters. `deployment_check --production` performs a Redis cache round-trip and fails if Redis is enabled but unreachable.
+- CSP is report-only/configurable by default; move to blocking CSP only after production asset/API/media domains are fully known.
 - Fulfillment does not include payments, invoices, shipping labels, buyer/seller messaging, or courier integrations.
 - The backfill command does not include force-recalculation; already-finalized disputed outcomes need manual admin review.
 - Outcome repair approval requires a second admin, but applying an approved repair does not yet require a third distinct admin.

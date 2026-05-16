@@ -90,6 +90,11 @@ def test_authenticated_bidder_is_rate_limited_after_allowed_attempt():
         metadata__reason=BidRejectionReason.RATE_LIMITED,
         metadata__bidder_id=bidder.id,
     ).exists()
+    assert AuditLog.objects.filter(
+        action=AuditAction.RATE_LIMIT_TRIGGERED,
+        metadata__scope="bid_create",
+        metadata__lot_id=lot.id,
+    ).exists()
 
 
 @override_settings(BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS=1, BID_RATE_LIMIT_WINDOW_SECONDS=60)
@@ -112,6 +117,11 @@ def test_anonymous_bid_attempts_are_rate_limited_after_first_rejection():
         action=AuditAction.BID_REJECTED,
         metadata__reason=BidRejectionReason.RATE_LIMITED,
         metadata__bidder_id=None,
+    ).exists()
+    assert AuditLog.objects.filter(
+        action=AuditAction.RATE_LIMIT_TRIGGERED,
+        metadata__scope="bid_create",
+        metadata__lot_id=lot.id,
     ).exists()
 
 

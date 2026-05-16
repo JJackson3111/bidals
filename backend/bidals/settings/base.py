@@ -5,6 +5,7 @@ import environ
 from django.core.exceptions import ImproperlyConfigured
 
 from bidals.storage import build_s3_storage_options
+from bidals.settings.validation import validate_rate_limit_settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ROOT_DIR = BASE_DIR.parent
@@ -50,6 +51,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "bidals.logging.RequestLogMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.audit.security.SecurityHeadersMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -72,8 +74,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "bidals.wsgi.application"
 
+DATABASE_URL_VALUE = env("DATABASE_URL", default=env("DJANGO_DATABASE_URL", default=""))
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+    "default": env.db(
+        "DATABASE_URL",
+        default=DATABASE_URL_VALUE or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    ),
 }
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=60)
 
@@ -150,15 +156,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
+    "EXCEPTION_HANDLER": "apps.audit.security.security_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=15)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7)),
+    "ROTATE_REFRESH_TOKENS": env.bool("JWT_ROTATE_REFRESH_TOKENS", default=True),
+    "BLACKLIST_AFTER_ROTATION": env.bool("JWT_BLACKLIST_AFTER_ROTATION", default=True),
     "UPDATE_LAST_LOGIN": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -221,6 +228,21 @@ else:
 BID_RATE_LIMIT_AUTHENTICATED_ATTEMPTS = env.int("BID_RATE_LIMIT_AUTHENTICATED_ATTEMPTS", default=10)
 BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS = env.int("BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS", default=2)
 BID_RATE_LIMIT_WINDOW_SECONDS = env.int("BID_RATE_LIMIT_WINDOW_SECONDS", default=60)
+ENABLE_RATE_LIMITING = env.bool("ENABLE_RATE_LIMITING", default=True)
+RATE_LIMIT_LOGIN = env("RATE_LIMIT_LOGIN", default="5/minute")
+RATE_LIMIT_REGISTRATION = env("RATE_LIMIT_REGISTRATION", default="5/minute")
+RATE_LIMIT_BID_CREATE = env("RATE_LIMIT_BID_CREATE", default="")
+RATE_LIMIT_PASSWORD_RESET = env("RATE_LIMIT_PASSWORD_RESET", default="3/hour")
+RATE_LIMIT_ADMIN_ACTIONS = env("RATE_LIMIT_ADMIN_ACTIONS", default="30/minute")
+validate_rate_limit_settings(
+    {
+        "RATE_LIMIT_LOGIN": RATE_LIMIT_LOGIN,
+        "RATE_LIMIT_REGISTRATION": RATE_LIMIT_REGISTRATION,
+        "RATE_LIMIT_BID_CREATE": RATE_LIMIT_BID_CREATE,
+        "RATE_LIMIT_PASSWORD_RESET": RATE_LIMIT_PASSWORD_RESET,
+        "RATE_LIMIT_ADMIN_ACTIONS": RATE_LIMIT_ADMIN_ACTIONS,
+    }
+)
 BID_ANOMALY_REJECT_THRESHOLD = env.int("BID_ANOMALY_REJECT_THRESHOLD", default=5)
 BID_ANOMALY_RATE_LIMIT_THRESHOLD = env.int("BID_ANOMALY_RATE_LIMIT_THRESHOLD", default=3)
 
@@ -243,6 +265,15 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = env("DJANGO_REFERRER_POLICY", default="same-origin")
+PERMISSIONS_POLICY = env(
+    "DJANGO_PERMISSIONS_POLICY",
+    default="camera=(), microphone=(), geolocation=(), payment=()",
+)
+CONTENT_SECURITY_POLICY = env("DJANGO_CONTENT_SECURITY_POLICY", default="")
+CONTENT_SECURITY_POLICY_REPORT_ONLY = env.bool("DJANGO_CONTENT_SECURITY_POLICY_REPORT_ONLY", default=True)
 
 _LOG_FORMATTER = "json" if ENABLE_STRUCTURED_LOGGING else "plain"
 

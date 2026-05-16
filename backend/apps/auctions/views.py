@@ -16,6 +16,13 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminRole
 from apps.audit.models import AuditAction, AuditLog
+from apps.audit.security import (
+    audit_security_event,
+    check_security_rate_limit,
+    client_ip,
+    rate_limited_response,
+    request_audit_metadata,
+)
 from apps.audit.serializers import AuditLogSerializer, SafeAuditLogSerializer
 from apps.auctions.models import (
     Auction,
@@ -96,6 +103,20 @@ def _parse_datetime_query_param(value: str | None, field_name: str):
 def _ensure_can_manage_lot_images(*, user, lot: Lot) -> None:
     if not (user and user.is_authenticated and (user.is_platform_admin or lot.auction.created_by_id == user.id)):
         raise PermissionDenied("Only the auction owner or an admin can manage lot images.")
+
+
+def _admin_action_rate_limit_response(request, scope: str):
+    rate_limit = check_security_rate_limit(
+        request,
+        scope=scope,
+        identifier=str(request.user.id) if request.user.is_authenticated else client_ip(request),
+        setting_name="RATE_LIMIT_ADMIN_ACTIONS",
+        default_rate="30/minute",
+        actor=request.user if request.user.is_authenticated else None,
+    )
+    if not rate_limit.allowed:
+        return rate_limited_response(rate_limit)
+    return None
 
 
 def _ensure_local_media_root_available() -> None:
@@ -328,6 +349,10 @@ class OutcomeRepairListView(APIView):
         return Response({"results": OutcomeRepairRequestSerializer(repairs[:200], many=True).data})
 
     def post(self, request):
+        limited = _admin_action_rate_limit_response(request, "outcome_repair_create")
+        if limited is not None:
+            return limited
+
         serializer = OutcomeRepairCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -357,6 +382,10 @@ class OutcomeRepairActionView(APIView):
     action_name = ""
 
     def post(self, request, pk):
+        limited = _admin_action_rate_limit_response(request, f"outcome_repair_{self.action_name}")
+        if limited is not None:
+            return limited
+
         try:
             if self.action_name == "approve":
                 serializer = OutcomeRepairApproveSerializer(data=request.data)
@@ -392,6 +421,10 @@ class OutcomeRepairCommentsView(APIView):
         return Response({"results": OutcomeRepairCommentSerializer(comments, many=True).data})
 
     def post(self, request, pk):
+        limited = _admin_action_rate_limit_response(request, "outcome_repair_comment")
+        if limited is not None:
+            return limited
+
         serializer = OutcomeRepairCommentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -411,6 +444,10 @@ class OutcomeRepairAuditView(APIView):
     permission_classes = (IsAuthenticated, IsAdminRole)
 
     def get(self, request, pk):
+        limited = _admin_action_rate_limit_response(request, "outcome_repair_audit")
+        if limited is not None:
+            return limited
+
         repair = _get_repair(pk)
         events = list(_repair_audit_queryset(repair))
         AuditLog.objects.create(
@@ -662,6 +699,7 @@ class LotViewSet(viewsets.ModelViewSet):
         if not rate_limit.allowed:
             server_timestamp = timezone.now()
             actor = request.user if request.user.is_authenticated else None
+            request_context = request_audit_metadata(request)
             AuditLog.objects.create(
                 actor=actor,
                 action=AuditAction.BID_REJECTED,
@@ -676,6 +714,21 @@ class LotViewSet(viewsets.ModelViewSet):
                     "reason": BidRejectionReason.RATE_LIMITED,
                     "rate_limit_scope": rate_limit.scope,
                     "rate_limit": rate_limit.limit,
+                    "retry_after": rate_limit.retry_after,
+                    **request_context,
+                },
+            )
+            audit_security_event(
+                request=request,
+                actor=actor,
+                action=AuditAction.RATE_LIMIT_TRIGGERED,
+                entity_type="lot",
+                entity_id=str(lot.id),
+                metadata={
+                    "lot_id": lot.id,
+                    "auction_id": lot.auction_id,
+                    "scope": "bid_create",
+                    "limit": rate_limit.limit,
                     "retry_after": rate_limit.retry_after,
                 },
             )
@@ -715,6 +768,7 @@ class LotViewSet(viewsets.ModelViewSet):
             user=request.user,
             lot_id=lot.id,
             amount=serializer.validated_data["amount"],
+            request_context=request_audit_metadata(request),
         )
         response = BidResultSerializer(result.as_dict()).data
 

@@ -18,6 +18,7 @@ from apps.accounts.permissions import IsAdminRole
 from apps.audit.models import AuditAction, AuditLog, NotificationStatus, OutboundNotification
 from apps.audit.serializers import AccountNotificationSerializer, AuditLogSerializer, OutboundNotificationSerializer
 from apps.audit.safety import metadata_summary
+from apps.audit.security import check_security_rate_limit, client_ip, rate_limited_response
 from apps.audit.services.readiness import run_release_check
 from apps.auctions.models import Bid, BidRejectionReason, BidStatus, FulfillmentRecord, FulfillmentStatus
 
@@ -34,6 +35,17 @@ class AdminActivityExportView(APIView):
     permission_classes = (IsAuthenticated, IsAdminRole)
 
     def get(self, request):
+        rate_limit = check_security_rate_limit(
+            request,
+            scope="admin_activity_export",
+            identifier=str(request.user.id) if request.user.is_authenticated else client_ip(request),
+            setting_name="RATE_LIMIT_ADMIN_ACTIONS",
+            default_rate="30/minute",
+            actor=request.user,
+        )
+        if not rate_limit.allowed:
+            return rate_limited_response(rate_limit)
+
         queryset = _filtered_audit_queryset(request.query_params).order_by("server_timestamp", "id")
         total_count = queryset.count()
         logs = list(queryset[:10000])

@@ -45,8 +45,9 @@ class BidResult:
         return data
 
 
-def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
+def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None = None) -> BidResult:
     amount = Decimal(amount)
+    request_context = request_context or {}
 
     with transaction.atomic():
         # The lot row is the bid-critical state. Lock it before reading price/status
@@ -67,6 +68,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 reason=BidRejectionReason.UNAUTHENTICATED,
                 server_timestamp=server_timestamp,
                 create_bid_record=False,
+                request_context=request_context,
             )
 
         if not _user_can_bid(user, lot):
@@ -76,6 +78,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 amount=amount,
                 reason=BidRejectionReason.USER_NOT_ALLOWED,
                 server_timestamp=server_timestamp,
+                request_context=request_context,
             )
 
         if not auction.is_live_at(server_timestamp):
@@ -85,6 +88,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 amount=amount,
                 reason=BidRejectionReason.AUCTION_NOT_LIVE,
                 server_timestamp=server_timestamp,
+                request_context=request_context,
             )
 
         if lot.status != LotStatus.OPEN:
@@ -94,6 +98,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 amount=amount,
                 reason=BidRejectionReason.LOT_CLOSED,
                 server_timestamp=server_timestamp,
+                request_context=request_context,
             )
 
         previous_price = lot.current_price
@@ -104,6 +109,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 amount=amount,
                 reason=BidRejectionReason.BID_TOO_LOW,
                 server_timestamp=server_timestamp,
+                request_context=request_context,
             )
 
         if not _is_valid_increment(amount=amount, current_price=previous_price, increment=lot.bid_increment):
@@ -113,6 +119,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 amount=amount,
                 reason=BidRejectionReason.INVALID_INCREMENT,
                 server_timestamp=server_timestamp,
+                request_context=request_context,
             )
 
         bid = Bid.objects.create(
@@ -138,6 +145,7 @@ def place_bid(user, lot_id: int, amount: Decimal) -> BidResult:
                 "amount": str(amount),
                 "previous_price": str(previous_price),
                 "new_price": str(lot.current_price),
+                **request_context,
             },
         )
         logger.info(
@@ -171,7 +179,9 @@ def _reject_bid(
     reason: str,
     server_timestamp,
     create_bid_record: bool = True,
+    request_context: dict | None = None,
 ) -> BidResult:
+    request_context = request_context or {}
     bid = None
     if create_bid_record:
         bid = Bid.objects.create(
@@ -196,6 +206,23 @@ def _reject_bid(
             "attempted_amount": str(amount),
             "current_price": str(lot.current_price),
             "reason": reason,
+            **request_context,
+        },
+    )
+    AuditLog.objects.create(
+        actor=actor,
+        action=_bid_rejection_audit_action(reason),
+        entity_type="bid" if bid else "lot",
+        entity_id=str(bid.id if bid else lot.id),
+        server_timestamp=server_timestamp,
+        metadata={
+            "lot_id": lot.id,
+            "auction_id": lot.auction_id,
+            "bidder_id": actor.id if actor else None,
+            "attempted_amount": str(amount),
+            "current_price": str(lot.current_price),
+            "reason": reason,
+            **request_context,
         },
     )
     logger.warning(
@@ -230,6 +257,12 @@ def _user_can_bid(user, lot: Lot) -> bool:
         return False
 
     return lot.auction.created_by_id != user.id
+
+
+def _bid_rejection_audit_action(reason: str) -> str:
+    if reason in {BidRejectionReason.UNAUTHENTICATED, BidRejectionReason.USER_NOT_ALLOWED, BidRejectionReason.SERVER_ERROR}:
+        return AuditAction.BID_REJECTED_SECURITY
+    return AuditAction.BID_REJECTED_VALIDATION
 
 
 def _is_valid_increment(*, amount: Decimal, current_price: Decimal, increment: Decimal) -> bool:

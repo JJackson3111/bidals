@@ -167,6 +167,10 @@ def test_rejects_unauthenticated_bid():
     assert result.reason == BidRejectionReason.UNAUTHENTICATED
     assert Bid.objects.filter(lot=lot).count() == 0
     assert AuditLog.objects.filter(action=AuditAction.BID_REJECTED, metadata__reason=BidRejectionReason.UNAUTHENTICATED).exists()
+    assert AuditLog.objects.filter(
+        action=AuditAction.BID_REJECTED_SECURITY,
+        metadata__reason=BidRejectionReason.UNAUTHENTICATED,
+    ).exists()
 
 
 def test_creates_audit_log_for_accepted_bid():
@@ -196,6 +200,11 @@ def test_creates_audit_log_for_rejected_bid():
     assert audit.metadata["attempted_amount"] == "80.00"
     assert audit.metadata["current_price"] == "90.00"
     assert audit.metadata["reason"] == BidRejectionReason.BID_TOO_LOW
+    assert AuditLog.objects.filter(
+        action=AuditAction.BID_REJECTED_VALIDATION,
+        entity_id=str(result.bid_id),
+        metadata__reason=BidRejectionReason.BID_TOO_LOW,
+    ).exists()
 
 
 def test_lot_price_updates_only_after_accepted_bid():
