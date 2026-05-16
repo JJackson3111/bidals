@@ -108,7 +108,7 @@ The helper runs:
 
 - `python manage.py migrate --check`
 - `python manage.py check`
-- `python manage.py verify_backup`
+- `python manage.py backup_verify`
 - `python manage.py release_check`
 - Optional health probe when `API_BASE_URL` is set.
 - Optional release candidate smoke when `RUN_RC_SMOKE=true`.

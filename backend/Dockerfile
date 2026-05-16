@@ -35,6 +35,8 @@ COPY --chown=app:app . .
 RUN DJANGO_SETTINGS_MODULE=bidals.settings.prod \
     DJANGO_SECRET_KEY=build-time-secret \
     DJANGO_ALLOWED_HOSTS=localhost \
+    DATABASE_URL=sqlite:////tmp/bidals-build.sqlite3 \
+    FRONTEND_URL=http://localhost:3000 \
     DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000 \
     DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:3000 \
     python manage.py collectstatic --noinput
@@ -50,4 +52,4 @@ EXPOSE 8000
 
 USER app
 
-CMD sh -c "python manage.py migrate && gunicorn bidals.wsgi:application --bind 0.0.0.0:$PORT"
+CMD ["sh", "-c", "python manage.py migrate && exec gunicorn bidals.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]

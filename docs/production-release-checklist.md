@@ -53,14 +53,14 @@ Run in production backend shell or release job:
 
 ```bash
 python manage.py deployment_check --production
-python manage.py verify_backup --fail-on-warn
+python manage.py backup_verify --fail-on-warn
 python manage.py release_check
 ```
 
 Expected:
 
 - `deployment_check --production` has no failures.
-- `verify_backup --fail-on-warn` passes only after backup and restore timestamps are fresh.
+- `backup_verify --fail-on-warn` passes only after backup and restore timestamps are fresh.
 - `release_check` has no unexpected failures. Manual `WARN` items must map to accepted release evidence.
 
 ## Deployment Steps

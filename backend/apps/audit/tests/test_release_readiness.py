@@ -57,6 +57,25 @@ def test_verify_backup_command_outputs_structure_and_audits(monkeypatch):
     USE_S3=False,
     EMAIL_NOTIFICATIONS_ENABLED=False,
 )
+def test_backup_verify_alias_command_outputs_structure(monkeypatch):
+    monkeypatch.setenv("BIDALS_ENV", "staging")
+    output = StringIO()
+
+    call_command("backup_verify", stdout=output)
+
+    rendered = output.getvalue()
+    assert "[PASS] database / Connectivity" in rendered
+    assert "Backup verification completed." in rendered
+
+
+@override_settings(
+    SECRET_KEY="release-check-test-secret",
+    DEBUG=False,
+    ALLOWED_HOSTS=["localhost", "testserver"],
+    USE_REDIS_CACHE=False,
+    USE_S3=False,
+    EMAIL_NOTIFICATIONS_ENABLED=False,
+)
 def test_release_check_command_outputs_report_without_secrets(monkeypatch):
     monkeypatch.setenv("BIDALS_ENV", "staging")
     output = StringIO()
@@ -66,10 +85,34 @@ def test_release_check_command_outputs_report_without_secrets(monkeypatch):
     rendered = output.getvalue()
     assert "Release readiness report generated" in rendered
     assert "[PASS] system / Health endpoint" in rendered
+    assert "cache / Redis/cache" in rendered
+    assert "static / Static files" in rendered
+    assert "security / CORS origins" in rendered
+    assert "security / CSRF trusted origins" in rendered
     assert "/api/health/" in rendered
     assert "system / SECRET_KEY" in rendered
     assert "release-check-test-secret" not in rendered
     assert AuditLog.objects.filter(action=AuditAction.RELEASE_CHECK_RUN).exists()
+
+
+@override_settings(
+    SECRET_KEY="unsafe-development-secret-key",
+    DEBUG=True,
+    ALLOWED_HOSTS=["localhost", "testserver"],
+    USE_REDIS_CACHE=False,
+    USE_S3=False,
+    EMAIL_NOTIFICATIONS_ENABLED=False,
+)
+def test_release_check_warns_for_development_secret_without_failing(monkeypatch):
+    monkeypatch.setenv("BIDALS_ENV", "development")
+    output = StringIO()
+
+    call_command("release_check", stdout=output)
+
+    rendered = output.getvalue()
+    assert "[WARN] system / SECRET_KEY" in rendered
+    assert "unsafe-development-secret-key" not in rendered
+    assert "Release check completed." in rendered
 
 
 @override_settings(
