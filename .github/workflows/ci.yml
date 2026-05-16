@@ -53,6 +53,12 @@ jobs:
       - name: Run Django checks
         run: python manage.py check
 
+      - name: Run operational readiness commands
+        run: |
+          python manage.py migrate --noinput
+          python manage.py release_check
+          python manage.py backup_verify
+
       - name: Run tests
         run: pytest
 

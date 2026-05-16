@@ -3,11 +3,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 
-from bidals.views import health_check
+from bidals.views import health_check, readiness_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("health/", health_check, name="root-health-check"),
+    path("health/ready/", readiness_check, name="root-readiness-check"),
     path("api/health/", health_check, name="health-check"),
+    path("api/health/ready/", readiness_check, name="api-readiness-check"),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/", include("apps.auctions.urls")),
     path("api/", include("apps.audit.urls")),

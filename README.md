@@ -182,6 +182,19 @@ Safe helper scripts, run from a repo checkout on an operator machine or CI runne
 - `sh scripts/restore_to_test_db.sh`: restores only to an explicitly confirmed non-production restore-test database.
 - `sh scripts/post_restore_validate.sh`: runs migrations/readiness checks and optional RC smoke against the restored environment.
 
+## Security And Operations Docs
+
+- [`docs/security-phase-1.md`](docs/security-phase-1.md): Secure Startup Platform controls and environment requirements.
+- [`docs/security-runbook.md`](docs/security-runbook.md): security deploy checks, audit review, suspicious activity response, and secret rotation.
+- [`docs/staging-environment.md`](docs/staging-environment.md): staging services, env vars, security posture, and smoke checklist.
+- [`docs/deployment-governance.md`](docs/deployment-governance.md): PR, CI, migration, deploy, and incident-note governance.
+- [`docs/release-checklist.md`](docs/release-checklist.md): concise release approval and post-deploy checklist.
+- [`docs/observability.md`](docs/observability.md): request IDs, structured logs, health/readiness, monitoring, and alerting guidance.
+- [`docs/backup-verification.md`](docs/backup-verification.md): backup metadata, restore rehearsal, and read-only verification.
+- [`docs/disaster-recovery.md`](docs/disaster-recovery.md): restore procedure, outage guides, and disaster recovery checklist.
+- [`docs/production-release-checklist.md`](docs/production-release-checklist.md): production release gate with Render cron, Redis, and R2 checks.
+- [`docs/rollback-runbook.md`](docs/rollback-runbook.md): code rollback, migration-aware rollback, and database recovery rollback.
+
 ## Phase Plan
 
 1. Backend foundation, models, authentication, and Docker.
@@ -301,6 +314,7 @@ Verify backup readiness and generate release readiness reports:
 
 ```bash
 docker compose exec backend python manage.py verify_backup
+docker compose exec backend python manage.py backup_verify
 docker compose exec backend python manage.py release_check
 ```
 
@@ -355,6 +369,13 @@ docker compose -f docker-compose.prod.yml up --build
 ```
 
 ## API Endpoints
+
+Health:
+
+- `GET /health/`
+- `GET /health/ready/`
+- `GET /api/health/`
+- `GET /api/health/ready/`
 
 Authentication:
 

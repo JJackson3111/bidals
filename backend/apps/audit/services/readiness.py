@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass, field
 import os
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client
@@ -65,6 +66,10 @@ def run_release_check(*, actor=None, audit: bool = True, request_id: str | None 
         _allowed_hosts_check(),
         _health_endpoint_check(),
         _migrations_check(),
+        _cache_check(),
+        _staticfiles_check(),
+        _cors_check(),
+        _csrf_check(),
         ReadinessCheck(
             category="database",
             name="Backup verification",
@@ -185,7 +190,10 @@ def _secret_key_check() -> ReadinessCheck:
     secret_key = getattr(settings, "SECRET_KEY", "")
     placeholder_values = {"unsafe-development-secret-key", "change-me-in-production", "replace-with-a-long-random-secret"}
     if not secret_key or secret_key.startswith("unsafe-") or secret_key in placeholder_values:
-        return ReadinessCheck("system", "SECRET_KEY", "FAIL", "Secret key is missing or uses the development placeholder.")
+        status = "WARN" if settings.DEBUG and runtime_environment() == "development" else "FAIL"
+        return ReadinessCheck("system", "SECRET_KEY", status, "Secret key is missing or uses the development placeholder.")
+    if len(secret_key) < 32:
+        return ReadinessCheck("system", "SECRET_KEY", "WARN", "Secret key is configured but should be at least 32 characters.")
     return ReadinessCheck("system", "SECRET_KEY", "PASS", "Secret key is configured.")
 
 
@@ -226,6 +234,53 @@ def _migrations_check() -> ReadinessCheck:
     if plan:
         return ReadinessCheck("database", "Migrations", "FAIL", f"{len(plan)} unapplied migration step(s) detected.")
     return ReadinessCheck("database", "Migrations", "PASS", "No unapplied migrations detected.")
+
+
+def _cache_check() -> ReadinessCheck:
+    if getattr(settings, "USE_REDIS_CACHE", False):
+        try:
+            key = f"release-check:{timezone.now().timestamp()}"
+            cache.set(key, "ok", timeout=30)
+            value = cache.get(key)
+            cache.delete(key)
+        except Exception as exc:
+            return ReadinessCheck("cache", "Redis/cache", "FAIL", "Cache connectivity failed.", {"error_type": type(exc).__name__})
+        if value != "ok":
+            return ReadinessCheck("cache", "Redis/cache", "FAIL", "Cache round-trip returned an unexpected value.")
+        return ReadinessCheck("cache", "Redis/cache", "PASS", "Cache round-trip succeeded.")
+
+    status = "WARN" if runtime_environment() in {"staging", "production"} else "PASS"
+    return ReadinessCheck("cache", "Redis/cache", status, "Redis cache is disabled; production should use Redis-backed counters.")
+
+
+def _staticfiles_check() -> ReadinessCheck:
+    static_root = str(getattr(settings, "STATIC_ROOT", "") or "")
+    staticfiles_storage = getattr(settings, "STORAGES", {}).get("staticfiles", {})
+    if not static_root:
+        return ReadinessCheck("static", "Static files", "FAIL", "STATIC_ROOT is not configured.")
+    if not staticfiles_storage.get("BACKEND"):
+        return ReadinessCheck("static", "Static files", "FAIL", "Static files storage backend is not configured.")
+    return ReadinessCheck("static", "Static files", "PASS", "Static files storage is configured.")
+
+
+def _cors_check() -> ReadinessCheck:
+    origins = list(getattr(settings, "CORS_ALLOWED_ORIGINS", []))
+    if "*" in origins:
+        return ReadinessCheck("security", "CORS origins", "FAIL", "Wildcard CORS origin is configured.")
+    if not origins:
+        status = "FAIL" if runtime_environment() == "production" else "WARN"
+        return ReadinessCheck("security", "CORS origins", status, "No CORS allowed origins are configured.")
+    return ReadinessCheck("security", "CORS origins", "PASS", f"{len(origins)} CORS origin(s) configured.")
+
+
+def _csrf_check() -> ReadinessCheck:
+    origins = list(getattr(settings, "CSRF_TRUSTED_ORIGINS", []))
+    if "*" in origins:
+        return ReadinessCheck("security", "CSRF trusted origins", "FAIL", "Wildcard CSRF trusted origin is configured.")
+    if not origins:
+        status = "FAIL" if runtime_environment() == "production" else "WARN"
+        return ReadinessCheck("security", "CSRF trusted origins", status, "No CSRF trusted origins are configured.")
+    return ReadinessCheck("security", "CSRF trusted origins", "PASS", f"{len(origins)} CSRF trusted origin(s) configured.")
 
 
 def _scheduled_jobs_check() -> ReadinessCheck:
