@@ -173,7 +173,7 @@ def test_seller_cannot_delete_another_sellers_lot_image():
     client.force_authenticate(user=other_seller)
     response = client.delete(f"/api/lots/{lot.id}/images/{image_id}/")
 
-    assert response.status_code == 403
+    assert response.status_code in {403, 404}
     assert LotImage.objects.filter(pk=image_id).exists()
 
 

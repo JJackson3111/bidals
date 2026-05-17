@@ -509,9 +509,7 @@ class AuctionViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.is_platform_admin:
             visible = queryset
         elif user.is_authenticated and user.can_sell:
-            visible = queryset.filter(
-                Q(status__in=VISIBLE_AUCTION_STATUSES) | Q(created_by=user)
-            )
+            visible = queryset.filter(created_by=user)
         else:
             visible = queryset.filter(status__in=VISIBLE_AUCTION_STATUSES)
 
@@ -614,10 +612,7 @@ class LotViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.is_platform_admin:
             visible = queryset
         elif user.is_authenticated and user.can_sell:
-            visible = queryset.filter(
-                Q(auction__status__in=VISIBLE_AUCTION_STATUSES, status__in=VISIBLE_LOT_STATUSES)
-                | Q(auction__created_by=user)
-            )
+            visible = queryset.filter(auction__created_by=user)
         else:
             visible = queryset.filter(
                 auction__status__in=VISIBLE_AUCTION_STATUSES,
