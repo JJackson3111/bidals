@@ -1,5 +1,6 @@
 from .base import *  # noqa: F403
 from .base import REDIS_CACHE_KEY_PREFIX, REDIS_CACHE_OPTIONS, REDIS_URL, env
+from .origins import configured_origins
 from .validation import assert_required_production_env
 from django.core.exceptions import ImproperlyConfigured
 
@@ -10,16 +11,18 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
 
 FRONTEND_URL = env("FRONTEND_URL", default="")
-CORS_ALLOWED_ORIGINS = env.list(
-    "DJANGO_CORS_ALLOWED_ORIGINS",
+CORS_ALLOWED_ORIGINS = configured_origins(
+    env,
+    ("DJANGO_CORS_ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"),
     default=[FRONTEND_URL] if FRONTEND_URL else [],
 )
-CSRF_TRUSTED_ORIGINS = env.list(
-    "DJANGO_CSRF_TRUSTED_ORIGINS",
+CSRF_TRUSTED_ORIGINS = configured_origins(
+    env,
+    ("DJANGO_CSRF_TRUSTED_ORIGINS", "CSRF_TRUSTED_ORIGINS"),
     default=[FRONTEND_URL] if FRONTEND_URL else [],
 )
 if "*" in CORS_ALLOWED_ORIGINS:
-    raise ImproperlyConfigured("DJANGO_CORS_ALLOWED_ORIGINS cannot contain '*' in production.")
+    raise ImproperlyConfigured("CORS allowed origins cannot contain '*' in production.")
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)

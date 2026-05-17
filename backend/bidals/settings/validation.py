@@ -23,11 +23,19 @@ def missing_required_production_env() -> list[str]:
     if not (_env_value("DATABASE_URL") or _env_value("DJANGO_DATABASE_URL")):
         missing.append("DATABASE_URL or DJANGO_DATABASE_URL")
 
-    if not (_env_value("FRONTEND_URL") or _env_value("DJANGO_CORS_ALLOWED_ORIGINS")):
-        missing.append("FRONTEND_URL or DJANGO_CORS_ALLOWED_ORIGINS")
+    if not (
+        _env_value("FRONTEND_URL")
+        or _env_value("DJANGO_CORS_ALLOWED_ORIGINS")
+        or _env_value("CORS_ALLOWED_ORIGINS")
+    ):
+        missing.append("FRONTEND_URL or DJANGO_CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS")
 
-    if not (_env_value("FRONTEND_URL") or _env_value("DJANGO_CSRF_TRUSTED_ORIGINS")):
-        missing.append("FRONTEND_URL or DJANGO_CSRF_TRUSTED_ORIGINS")
+    if not (
+        _env_value("FRONTEND_URL")
+        or _env_value("DJANGO_CSRF_TRUSTED_ORIGINS")
+        or _env_value("CSRF_TRUSTED_ORIGINS")
+    ):
+        missing.append("FRONTEND_URL or DJANGO_CSRF_TRUSTED_ORIGINS or CSRF_TRUSTED_ORIGINS")
 
     return missing
 

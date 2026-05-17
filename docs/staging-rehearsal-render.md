@@ -11,7 +11,7 @@ This document is the Phase 17 execution record. Fill in the evidence sections du
 - GitHub repository URL:
 - Render workspace/team:
 - Backend staging URL: `https://bidals.onrender.com`
-- Frontend staging URL: `https://bidals-1.onrender.com`
+- Frontend staging URL: `https://bidals-frontend-staging.onrender.com`
 - Managed PostgreSQL service name:
 - Managed Redis service name:
 - Backup source:
@@ -52,13 +52,15 @@ This document is the Phase 17 execution record. Fill in the evidence sections du
 python manage.py migrate
 ```
 
-8. Create the frontend web service from the same GitHub repository. `PASS`: frontend is reachable at `https://bidals-1.onrender.com`.
+8. Create the frontend web service from the same GitHub repository. `PASS`: frontend is reachable at `https://bidals-frontend-staging.onrender.com`.
 9. Use `frontend/Dockerfile.prod`.
 10. Set the frontend build arg/env value:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://<backend-staging-host>/api
+NEXT_PUBLIC_API_BASE_URL=https://bidals.onrender.com/api
 ```
+
+This must be configured in Render before redeploying the frontend. If it is absent or set to `http://localhost:8000/api`, browser requests from the deployed frontend will fail before reaching Django.
 
 11. Set frontend health check path to `/api/health`.
 12. Confirm both services deploy from GitHub and report healthy. `PASS`: backend health, frontend health, and RC smoke have been confirmed.
@@ -69,9 +71,9 @@ Confirmed staging evidence so far:
 | --- | --- | --- |
 | Backend health | PASS | `GET https://bidals.onrender.com/api/health/` returns `200 OK` with `{"status":"ok","service":"bidals-backend"}` |
 | Backend auction list | PASS | Initially returned `200 OK` with `{"count":0,"next":null,"previous":null,"results":[]}`. After smoke setup, returned `count=2` with Phase 17 smoke auctions. |
-| Frontend load | PASS | `https://bidals-1.onrender.com` loads successfully |
-| Frontend health | PASS | `GET https://bidals-1.onrender.com/api/health` returns `200 OK` with `{"status":"ok","service":"bidals-frontend"}` |
-| Frontend browse route | PASS | `GET https://bidals-1.onrender.com/auctions` returns `200 OK`; operator confirmed Browse now shows empty states for no auctions/lots. |
+| Frontend load | PASS | `https://bidals-frontend-staging.onrender.com` loads successfully |
+| Frontend health | PASS | `GET https://bidals-frontend-staging.onrender.com/api/health` returns `200 OK` with `{"status":"ok","service":"bidals-frontend"}` |
+| Frontend browse route | PASS | `GET https://bidals-frontend-staging.onrender.com/auctions` returns `200 OK`; operator confirmed Browse now shows empty states for no auctions/lots. |
 | Frontend browse empty state | PASS | Browse page no longer treats a valid empty DRF paginated response as an error. |
 | Bid endpoint after `cb9ca78` redeploy | PASS | Fresh smoke lot id `4`: valid bid `15.00` returned `201 accepted`, invalid bid `16.00` returned `409 INVALID_INCREMENT`, anonymous bid `20.00` returned `401 UNAUTHENTICATED`, and `current_price` moved only from `10.00` to `15.00`. |
 | Render `release_check` | PASS/WARN | Render shell check passes health endpoint, migrations, audit logs, and admin export installation/protection. Scheduler execution is now independently verified; rerun `release_check` after setting `SCHEDULED_JOBS_CONFIGURED=True` to clear the earlier scheduled-jobs WARN. Final RC smoke now verifies fulfillment, notifications, admin export CSV, and auction lifecycle. Remaining production blocker is backup/restore proof. |
@@ -91,8 +93,8 @@ Backend:
 - `DJANGO_SECRET_KEY=<configured in Render secret manager>`
 - `DJANGO_DEBUG=False`
 - `DJANGO_ALLOWED_HOSTS=<backend staging host>`
-- `DJANGO_CORS_ALLOWED_ORIGINS=<frontend staging origin>`
-- `DJANGO_CSRF_TRUSTED_ORIGINS=<frontend staging origin>`
+- `CORS_ALLOWED_ORIGINS=https://bidals-frontend-staging.onrender.com`
+- `CSRF_TRUSTED_ORIGINS=https://bidals-frontend-staging.onrender.com`
 - `DJANGO_SECURE_SSL_REDIRECT=True`
 - `DJANGO_SECURE_HSTS_SECONDS=0` for first staging HTTPS validation, then raise if desired
 - `DATABASE_URL=<Render PostgreSQL internal/external URL>`
@@ -136,7 +138,7 @@ Backend:
 
 Frontend:
 
-- `NEXT_PUBLIC_API_BASE_URL=https://<backend-staging-host>/api`
+- `NEXT_PUBLIC_API_BASE_URL=https://bidals.onrender.com/api`
 - `NEXT_TELEMETRY_DISABLED=1`
 
 ## Scheduler Configuration
@@ -162,7 +164,7 @@ These required vars apply to `close_expired_auctions`, `monitor_bid_anomalies`, 
 
 Copy these from the backend web service when enabled/configured:
 
-- Frontend/origin parity: `FRONTEND_URL`, `DJANGO_CORS_ALLOWED_ORIGINS`, `DJANGO_CSRF_TRUSTED_ORIGINS`
+- Frontend/origin parity: `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`/`DJANGO_CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`/`DJANGO_CSRF_TRUSTED_ORIGINS`
 - Redis: `USE_REDIS_CACHE`, `REDIS_URL`, `REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS`, `REDIS_SOCKET_TIMEOUT_SECONDS`, `REDIS_CACHE_KEY_PREFIX`
 - Object storage: `USE_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`, `AWS_S3_REGION_NAME`, `AWS_S3_CUSTOM_DOMAIN`, `AWS_QUERYSTRING_AUTH`, `AWS_S3_ADDRESSING_STYLE`, `AWS_S3_SIGNATURE_VERSION`, `AWS_S3_CACHE_CONTROL`
 - Email/notifications: `EMAIL_NOTIFICATIONS_ENABLED`, `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`
@@ -400,7 +402,7 @@ Remaining readiness warnings:
 | Area | Check | Result | Evidence / notes |
 | --- | --- | --- | --- |
 | Health | Backend `/api/health/` returns ok | PASS | `https://bidals.onrender.com/api/health/` returned 200 OK with backend service payload. |
-| Health | Frontend `/api/health` returns ok | PASS | `https://bidals-1.onrender.com/api/health` returned 200 OK with frontend service payload. |
+| Health | Frontend `/api/health` returns ok | PASS | `https://bidals-frontend-staging.onrender.com/api/health` returned 200 OK with frontend service payload. |
 | Auth | Register works | PASS | Created `phase17_seller_1777996033` and `phase17_bidder_1777996033` through `POST /api/auth/register/`. |
 | Auth | Login works | PASS | Seller and bidder received JWT login responses through `POST /api/auth/login/`. |
 | Core | Create auction | PASS | Seller created auction `PHASE17 SMOKE AUCTION 1777996033`, id `2`, status `live`. |
@@ -445,7 +447,7 @@ Remaining readiness warnings:
 | Severity | Issue | Steps to reproduce | Status |
 | --- | --- | --- | --- |
 | Critical | Staging bid endpoint returned `500` for authenticated valid bid, authenticated invalid bid, and anonymous bid probe. | Original failure reproduced on lot id `2`. After redeploy commit `cb9ca78`, fresh lot id `4` was tested with valid, invalid, and anonymous bid attempts. | FIXED AND VERIFIED - valid bid now returns `201 accepted`, invalid increment returns controlled `409 INVALID_INCREMENT`, anonymous bid returns controlled `401 UNAUTHENTICATED`, and lot state remains authoritative. |
-| Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-1.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
+| Medium | Frontend Browse page treated staging empty auction data as an error state. | Open `https://bidals-frontend-staging.onrender.com/auctions` while `GET https://bidals.onrender.com/api/auctions/` returns `{"count":0,"next":null,"previous":null,"results":[]}`. | FIXED AND VERIFIED |
 | High | Documented staging admin credentials were not available. | Earlier `POST /api/auth/login/` with `staging_admin` / `ChangeMe123!` returned `401`; staging admin setup was then repaired. | FIXED AND VERIFIED - `https://bidals.onrender.com/admin/` loads successfully and `staging_admin` can log in. |
 | High | Backup restore still needs real evidence. | Attempt Phase 17 completion without managed PostgreSQL restore proof. | OPEN/WARN - scheduler execution is verified for all cron jobs through the hardened runner; backup/restore proof remains open. |
 | High | Render cron jobs can fall back to SQLite/dev settings when run as raw inline commands. | `python manage.py monitor_bid_anomalies --window-minutes 60` in Render cron failed with `django.db.utils.OperationalError: unable to open database file`. A later relative wrapper command failed with `sh: 0: cannot open scripts/run_scheduled_job.sh: No such file`. | FIXED AND VERIFIED - all cron jobs now use `sh /app/scripts/run_scheduled_job.sh ...` and show production settings plus PostgreSQL diagnostics. |

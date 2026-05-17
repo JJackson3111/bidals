@@ -509,9 +509,7 @@ class AuctionViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.is_platform_admin:
             visible = queryset
         elif user.is_authenticated and user.can_sell:
-            visible = queryset.filter(
-                Q(status__in=VISIBLE_AUCTION_STATUSES) | Q(created_by=user)
-            )
+            visible = queryset.filter(created_by=user)
         else:
             visible = queryset.filter(status__in=VISIBLE_AUCTION_STATUSES)
 
@@ -570,6 +568,17 @@ class AuctionViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["get"], permission_classes=(IsAuthenticated,))
+    def manage(self, request, pk=None):
+        auction = self.get_object()
+        user = request.user
+        if not user.can_sell:
+            raise PermissionDenied("Only sellers and admins can manage auctions.")
+        if not user.is_platform_admin and auction.created_by_id != user.id:
+            raise PermissionDenied("You can only manage your own auctions.")
+
+        return Response(AuctionSerializer(auction).data)
+
+    @action(detail=True, methods=["get"], permission_classes=(IsAuthenticated,))
     def results(self, request, pk=None):
         auction = self.get_object()
         user = request.user
@@ -603,10 +612,7 @@ class LotViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.is_platform_admin:
             visible = queryset
         elif user.is_authenticated and user.can_sell:
-            visible = queryset.filter(
-                Q(auction__status__in=VISIBLE_AUCTION_STATUSES, status__in=VISIBLE_LOT_STATUSES)
-                | Q(auction__created_by=user)
-            )
+            visible = queryset.filter(auction__created_by=user)
         else:
             visible = queryset.filter(
                 auction__status__in=VISIBLE_AUCTION_STATUSES,

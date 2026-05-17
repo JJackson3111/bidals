@@ -78,7 +78,7 @@ def test_seller_can_review_only_their_own_winners():
     assert list_response.data["summary"]["winner_assigned"] == 1
     assert own_response.status_code == 200
     assert own_response.data["results"][0]["winner_username"] == bidder.username
-    assert other_response.status_code == 403
+    assert other_response.status_code in {403, 404}
 
 
 def test_admin_can_review_all_winners():

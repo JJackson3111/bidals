@@ -10,8 +10,8 @@ Use this after deploys, security-sensitive changes, or suspicious activity.
    ```
 2. Confirm `DEBUG=False` in the deployment environment.
 3. Confirm `DJANGO_ALLOWED_HOSTS` contains only deployed backend hosts.
-4. Confirm `DJANGO_CORS_ALLOWED_ORIGINS` contains only deployed frontend origins.
-5. Confirm `DJANGO_CSRF_TRUSTED_ORIGINS` contains only trusted HTTPS origins.
+4. Confirm `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS` contains only deployed frontend origins.
+5. Confirm `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS` contains only trusted HTTPS origins.
 6. Confirm `USE_REDIS_CACHE=True` and Redis passes `deployment_check --production`.
 7. Confirm `USE_S3=True` for production media storage.
 8. Confirm `/api/health/` returns `{"status":"ok"}`.

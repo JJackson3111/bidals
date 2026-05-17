@@ -935,8 +935,8 @@ Backend:
 - `DJANGO_SECRET_KEY`: required in production; generate a long random value.
 - `DJANGO_DEBUG`: must be `False` in production.
 - `DJANGO_ALLOWED_HOSTS`: comma-separated backend hostnames.
-- `DJANGO_CORS_ALLOWED_ORIGINS`: comma-separated frontend origins.
-- `DJANGO_CSRF_TRUSTED_ORIGINS`: comma-separated trusted frontend origins.
+- `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS`: comma-separated frontend origins.
+- `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS`: comma-separated trusted frontend origins.
 - `DJANGO_SECURE_SSL_REDIRECT`: usually `True` in production.
 - `DJANGO_SECURE_HSTS_SECONDS`: use `31536000` after HTTPS is confirmed.
 - `DATABASE_URL`: managed PostgreSQL URL.
@@ -1109,8 +1109,8 @@ These required vars apply to all three scheduled jobs, including `deliver_notifi
 Recommended to copy from the backend web service for parity:
 
 - `FRONTEND_URL`
-- `DJANGO_CORS_ALLOWED_ORIGINS`
-- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS`
+- `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS`
 - `DJANGO_SECURE_SSL_REDIRECT`
 - `DJANGO_SECURE_HSTS_SECONDS`
 - `DATABASE_CONN_MAX_AGE`
@@ -1250,7 +1250,7 @@ Frontend settings:
 Common Render issues:
 
 - `DJANGO_ALLOWED_HOSTS` must include the Render backend hostname and any custom API domain.
-- `DJANGO_CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS` must include the frontend URL.
+- `DJANGO_CORS_ALLOWED_ORIGINS`/`CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` must include the frontend URL.
 - Run migrations before serving new code.
 - Keep `DJANGO_SECURE_SSL_REDIRECT=True` once HTTPS is working.
 
@@ -1432,7 +1432,7 @@ Use this suite before production releases to validate the full backend-owned auc
 ```bash
 cd frontend
 RC_SMOKE_API_BASE_URL=https://bidals.onrender.com/api \
-RC_SMOKE_FRONTEND_URL=https://bidals-1.onrender.com \
+RC_SMOKE_FRONTEND_URL=https://bidals-frontend-staging.onrender.com \
 RC_SMOKE_SELLER_USERNAME=<seller> \
 RC_SMOKE_SELLER_PASSWORD=<seller-password> \
 RC_SMOKE_BIDDER_USERNAME=<bidder> \
@@ -1660,7 +1660,7 @@ If auction closing or winner calculation fails:
 - Use a real `DJANGO_SECRET_KEY` from the provider's secret manager.
 - Production settings fail fast unless `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, database URL, and frontend/CORS/CSRF origins are configured.
 - Keep `SENTRY_DSN`, database URLs, Redis URLs, and object storage secrets in provider secret management.
-- Restrict `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`, and `DJANGO_CSRF_TRUSTED_ORIGINS`.
+- Restrict `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`/`CORS_ALLOWED_ORIGINS`, and `DJANGO_CSRF_TRUSTED_ORIGINS`/`CSRF_TRUSTED_ORIGINS`.
 - Keep HTTPS enabled and set secure cookies in production: `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, `SESSION_COOKIE_HTTPONLY=True`, and SameSite `Lax` or stricter where safe.
 - Keep `DJANGO_SECURE_HSTS_SECONDS`, `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`, and `DJANGO_SECURE_HSTS_PRELOAD` aligned with the deployed HTTPS posture.
 - Use `DJANGO_PERMISSIONS_POLICY` and staged `DJANGO_CONTENT_SECURITY_POLICY` / `DJANGO_CONTENT_SECURITY_POLICY_REPORT_ONLY` for secure headers.

@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -7,6 +9,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
+from bidals.settings.origins import comma_separated_urls, configured_origins
 from bidals.settings.validation import missing_required_production_env, validate_rate_limit_settings
 
 pytestmark = pytest.mark.django_db
@@ -49,6 +52,43 @@ def test_configured_cors_origin_is_allowed_and_unknown_origin_is_rejected():
     assert "Access-Control-Allow-Origin" not in unknown
 
 
+@override_settings(CORS_ALLOWED_ORIGINS=["https://bidals-frontend-staging.onrender.com"])
+def test_registration_options_preflight_allows_staging_frontend_origin():
+    response = Client().options(
+        "/api/auth/register/",
+        HTTP_ORIGIN="https://bidals-frontend-staging.onrender.com",
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+    )
+
+    assert response.status_code == 200
+    assert response["Access-Control-Allow-Origin"] == "https://bidals-frontend-staging.onrender.com"
+    assert "POST" in response["Access-Control-Allow-Methods"]
+
+
+def test_origin_settings_accept_render_alias_env_names_and_comma_separated_values(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://app.example, https://bidals-frontend-staging.onrender.com")
+    monkeypatch.setenv("DJANGO_CORS_ALLOWED_ORIGINS", "https://legacy.example,https://app.example")
+
+    origins = configured_origins(
+        lambda name, default="": os.environ.get(name, default),
+        ("DJANGO_CORS_ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"),
+    )
+
+    assert origins == [
+        "https://legacy.example",
+        "https://app.example",
+        "https://bidals-frontend-staging.onrender.com",
+    ]
+
+
+def test_comma_separated_urls_trims_blank_entries():
+    assert comma_separated_urls(" https://one.example, ,https://two.example ") == [
+        "https://one.example",
+        "https://two.example",
+    ]
+
+
 def test_production_env_validation_reports_all_missing_critical_values(monkeypatch):
     for name in (
         "DJANGO_SECRET_KEY",
@@ -57,7 +97,9 @@ def test_production_env_validation_reports_all_missing_critical_values(monkeypat
         "DJANGO_DATABASE_URL",
         "FRONTEND_URL",
         "DJANGO_CORS_ALLOWED_ORIGINS",
+        "CORS_ALLOWED_ORIGINS",
         "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "CSRF_TRUSTED_ORIGINS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -66,8 +108,21 @@ def test_production_env_validation_reports_all_missing_critical_values(monkeypat
     assert "DJANGO_SECRET_KEY" in missing
     assert "DJANGO_ALLOWED_HOSTS" in missing
     assert "DATABASE_URL or DJANGO_DATABASE_URL" in missing
-    assert "FRONTEND_URL or DJANGO_CORS_ALLOWED_ORIGINS" in missing
-    assert "FRONTEND_URL or DJANGO_CSRF_TRUSTED_ORIGINS" in missing
+    assert "FRONTEND_URL or DJANGO_CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS" in missing
+    assert "FRONTEND_URL or DJANGO_CSRF_TRUSTED_ORIGINS or CSRF_TRUSTED_ORIGINS" in missing
+
+
+def test_production_env_validation_accepts_render_origin_aliases(monkeypatch):
+    monkeypatch.setenv("DJANGO_SECRET_KEY", "secret")
+    monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "bidals.onrender.com")
+    monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@db:5432/bidals")
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    monkeypatch.delenv("DJANGO_CORS_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.delenv("DJANGO_CSRF_TRUSTED_ORIGINS", raising=False)
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://bidals-frontend-staging.onrender.com")
+    monkeypatch.setenv("CSRF_TRUSTED_ORIGINS", "https://bidals-frontend-staging.onrender.com")
+
+    assert missing_required_production_env() == []
 
 
 def test_invalid_rate_limit_values_fail_validation_before_request_time():
