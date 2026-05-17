@@ -446,7 +446,7 @@ export interface RegisterInput {
   username: string;
   email: string;
   password: string;
-  role: "bidder" | "seller";
+  account_type: "bidder" | "seller";
 }
 
 export interface CreateAuctionInput {

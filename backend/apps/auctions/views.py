@@ -570,6 +570,17 @@ class AuctionViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["get"], permission_classes=(IsAuthenticated,))
+    def manage(self, request, pk=None):
+        auction = self.get_object()
+        user = request.user
+        if not user.can_sell:
+            raise PermissionDenied("Only sellers and admins can manage auctions.")
+        if not user.is_platform_admin and auction.created_by_id != user.id:
+            raise PermissionDenied("You can only manage your own auctions.")
+
+        return Response(AuctionSerializer(auction).data)
+
+    @action(detail=True, methods=["get"], permission_classes=(IsAuthenticated,))
     def results(self, request, pk=None):
         auction = self.get_object()
         user = request.user

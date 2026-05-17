@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Extract<UserRole, "bidder" | "seller">>("bidder");
+  const [accountType, setAccountType] = useState<Extract<UserRole, "bidder" | "seller">>("bidder");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,11 +25,11 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register({ username, email, password, role });
+      await register({ username, email, password, account_type: accountType });
       setSuccess("Account created. You can login now.");
       setPassword("");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to register.");
+      setError(ApiError.messageFrom(err, "Unable to register."));
     } finally {
       setIsSubmitting(false);
     }
@@ -53,7 +53,7 @@ export default function RegisterPage() {
           </div>
           <div className="form-field">
             <label htmlFor="role">Account type</label>
-            <select id="role" value={role} onChange={(event) => setRole(event.target.value as "bidder" | "seller")}>
+            <select id="role" value={accountType} onChange={(event) => setAccountType(event.target.value as "bidder" | "seller")}>
               <option value="bidder">Bidder</option>
               <option value="seller">Seller</option>
             </select>
@@ -76,4 +76,3 @@ export default function RegisterPage() {
     </main>
   );
 }
-

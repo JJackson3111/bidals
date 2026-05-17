@@ -52,8 +52,8 @@ Check these values in the provider secret manager, not in code:
 - `DJANGO_DEBUG=False`
 - `DJANGO_SECRET_KEY` is strong and non-placeholder.
 - `DJANGO_ALLOWED_HOSTS` contains production backend hosts only.
-- `DJANGO_CORS_ALLOWED_ORIGINS` contains production frontend origins only.
-- `DJANGO_CSRF_TRUSTED_ORIGINS` contains trusted production origins.
+- `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS` contains production frontend origins only.
+- `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS` contains trusted production origins.
 - `DATABASE_URL` points to production PostgreSQL.
 - `USE_REDIS_CACHE=True` and `REDIS_URL` points to production Redis.
 - `USE_S3=True` and storage values point to production media storage.

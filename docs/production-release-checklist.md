@@ -28,8 +28,8 @@ Backend production env:
 - `DJANGO_DEBUG=False`
 - `DJANGO_SECRET_KEY` configured with a non-placeholder value.
 - `DJANGO_ALLOWED_HOSTS` contains production backend domains only.
-- `DJANGO_CORS_ALLOWED_ORIGINS` contains production frontend origins only.
-- `DJANGO_CSRF_TRUSTED_ORIGINS` contains production frontend/backend origins.
+- `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS` contains production frontend origins only.
+- `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS` contains production frontend/backend origins.
 - `DATABASE_URL` points to paid/production PostgreSQL.
 - `USE_REDIS_CACHE=True`
 - `REDIS_URL` points to production Redis.

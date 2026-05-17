@@ -17,10 +17,10 @@ Core rule: staging must use the same backend-owned auction, bid, winner, fulfill
 
 Current Render staging pattern:
 
-- Frontend: `https://<frontend-staging-host>`
-- Backend API: `https://<backend-staging-host>/api`
-- Backend health: `https://<backend-staging-host>/health/`
-- Backend readiness: `https://<backend-staging-host>/health/ready/`
+- Frontend: `https://bidals-frontend-staging.onrender.com`
+- Backend API: `https://bidals.onrender.com/api`
+- Backend health: `https://bidals.onrender.com/health/`
+- Backend readiness: `https://bidals.onrender.com/health/ready/`
 
 Do not record secrets, database URLs, Redis URLs, API tokens, or object storage keys in this document.
 
@@ -35,8 +35,8 @@ DJANGO_DEBUG=False
 DJANGO_SECRET_KEY=<staging-secret>
 DJANGO_ALLOWED_HOSTS=<backend-staging-host>
 FRONTEND_URL=https://<frontend-staging-host>
-DJANGO_CORS_ALLOWED_ORIGINS=https://<frontend-staging-host>
-DJANGO_CSRF_TRUSTED_ORIGINS=https://<frontend-staging-host>
+CORS_ALLOWED_ORIGINS=https://bidals-frontend-staging.onrender.com
+CSRF_TRUSTED_ORIGINS=https://bidals-frontend-staging.onrender.com
 DATABASE_URL=<staging-postgres-url>
 USE_REDIS_CACHE=True
 REDIS_URL=<staging-redis-url>
@@ -53,9 +53,13 @@ ENABLE_RATE_LIMITING=True
 Frontend staging baseline:
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=https://<backend-staging-host>/api
+NEXT_PUBLIC_API_BASE_URL=https://bidals.onrender.com/api
 NEXT_TELEMETRY_DISABLED=1
 ```
+
+The backend also accepts the older `DJANGO_CORS_ALLOWED_ORIGINS` and `DJANGO_CSRF_TRUSTED_ORIGINS` names. If both forms are set, values are merged and de-duplicated.
+
+On Render, configure `NEXT_PUBLIC_API_BASE_URL` as both the frontend service environment variable and Docker build argument so Next.js bakes the public backend API URL into client-side bundles. Do not use `http://localhost:8000/api` outside local development.
 
 ## Security Expectations
 

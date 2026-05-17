@@ -19,14 +19,16 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
-    role = serializers.ChoiceField(
+    account_type = serializers.ChoiceField(
         choices=(UserRole.BIDDER, UserRole.SELLER),
         default=UserRole.BIDDER,
+        source="role",
+        write_only=True,
     )
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "password", "role")
+        fields = ("id", "username", "email", "password", "account_type")
         read_only_fields = ("id",)
 
     def validate_password(self, value):

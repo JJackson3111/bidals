@@ -20,6 +20,14 @@ function toIsoDateTime(value: string): string {
   return new Date(value).toISOString();
 }
 
+function loadErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && [403, 404].includes(error.status)) {
+    return "Auction not found or you do not have access to edit it.";
+  }
+
+  return error instanceof ApiError ? error.message : "Unable to load auction.";
+}
+
 export default function EditAuctionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -38,14 +46,14 @@ export default function EditAuctionPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const auction = await api.getAuction(params.id);
+        const auction = await api.getManageAuction(params.id);
         setTitle(auction.title);
         setDescription(auction.description);
         setStartTime(toDateTimeLocal(auction.start_time));
         setEndTime(toDateTimeLocal(auction.end_time));
         setAuctionStatus(auction.status);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Unable to load auction.");
+        setError(loadErrorMessage(err));
       } finally {
         setIsLoading(false);
       }

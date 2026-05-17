@@ -57,7 +57,7 @@ Do not commit these values. Set them in your shell, CI secret store, or local se
 
 ```bash
 RC_SMOKE_API_BASE_URL=https://bidals.onrender.com/api
-RC_SMOKE_FRONTEND_URL=https://bidals-1.onrender.com
+RC_SMOKE_FRONTEND_URL=https://bidals-frontend-staging.onrender.com
 
 RC_SMOKE_SELLER_USERNAME=<staging seller username>
 RC_SMOKE_SELLER_PASSWORD=<staging seller password>

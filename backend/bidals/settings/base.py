@@ -5,6 +5,7 @@ import environ
 from django.core.exceptions import ImproperlyConfigured
 
 from bidals.storage import build_s3_storage_options
+from bidals.settings.origins import configured_origins
 from bidals.settings.validation import validate_rate_limit_settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -189,12 +190,14 @@ if SENTRY_DSN:
         send_default_pii=False,
     )
 
-CORS_ALLOWED_ORIGINS = env.list(
-    "DJANGO_CORS_ALLOWED_ORIGINS",
+CORS_ALLOWED_ORIGINS = configured_origins(
+    env,
+    ("DJANGO_CORS_ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"),
     default=["http://localhost:3000", "http://127.0.0.1:3000"],
 )
-CSRF_TRUSTED_ORIGINS = env.list(
-    "DJANGO_CSRF_TRUSTED_ORIGINS",
+CSRF_TRUSTED_ORIGINS = configured_origins(
+    env,
+    ("DJANGO_CSRF_TRUSTED_ORIGINS", "CSRF_TRUSTED_ORIGINS"),
     default=["http://localhost:3000", "http://127.0.0.1:3000"],
 )
 

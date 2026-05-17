@@ -33,7 +33,12 @@ import type {
   WonLotsResponse,
 } from "@/lib/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+const LOCAL_API_BASE_URL = "http://localhost:8000/api";
+const RENDER_STAGING_API_BASE_URL = "https://bidals.onrender.com/api";
+const RENDER_STAGING_FRONTEND_HOSTS = new Set([
+  "bidals-frontend-staging.onrender.com",
+  "bidals-1.onrender.com",
+]);
 
 export class ApiError extends Error {
   status: number;
@@ -45,11 +50,76 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
+
+  static messageFrom(error: unknown, fallback = "Request failed."): string {
+    if (error instanceof ApiError) {
+      return extractErrorMessage(error.body) || error.message || fallback;
+    }
+
+    if (isApiErrorLike(error)) {
+      return extractErrorMessage(error.body) || error.message || fallback;
+    }
+
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return fallback;
+  }
 }
 
 type ApiOptions = RequestInit & {
   auth?: boolean;
 };
+
+function resolveApiBaseUrl(): string {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const browserHostname = getBrowserHostname();
+  const configuredBaseUrlIsUnsafe = Boolean(
+    configuredBaseUrl
+      && browserHostname
+      && !isLocalHostname(browserHostname)
+      && isLocalApiBaseUrl(configuredBaseUrl),
+  );
+
+  if (configuredBaseUrl && !configuredBaseUrlIsUnsafe) {
+    return normalizeApiBaseUrl(configuredBaseUrl);
+  }
+
+  if (browserHostname && RENDER_STAGING_FRONTEND_HOSTS.has(browserHostname)) {
+    return RENDER_STAGING_API_BASE_URL;
+  }
+
+  if (configuredBaseUrlIsUnsafe) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL must not point at localhost outside local development.");
+  }
+
+  if (process.env.NODE_ENV === "development" || (browserHostname && isLocalHostname(browserHostname))) {
+    return LOCAL_API_BASE_URL;
+  }
+
+  throw new Error("NEXT_PUBLIC_API_BASE_URL must be configured for deployed frontend builds.");
+}
+
+function normalizeApiBaseUrl(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function getBrowserHostname(): string | null {
+  return typeof window === "undefined" ? null : window.location.hostname;
+}
+
+function isLocalApiBaseUrl(value: string): boolean {
+  try {
+    return isLocalHostname(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isLocalHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
 
 async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -67,7 +137,7 @@ async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     ...options,
     headers,
   });
@@ -92,12 +162,49 @@ function extractErrorMessage(body: unknown): string | null {
   if (typeof record.message === "string") return record.message;
   if (typeof record.reason === "string") return record.reason;
 
-  const firstKey = Object.keys(record)[0];
-  const firstValue = firstKey ? record[firstKey] : undefined;
-  if (Array.isArray(firstValue)) return `${firstKey}: ${firstValue.join(" ")}`;
-  if (typeof firstValue === "string") return `${firstKey}: ${firstValue}`;
+  const fieldMessages = Object.entries(record)
+    .map(([key, value]) => {
+      const message = formatErrorValue(value);
+      return message ? `${humanizeFieldName(key)}: ${message}` : "";
+    })
+    .filter(Boolean);
+
+  if (fieldMessages.length) return fieldMessages.join(" ");
 
   return null;
+}
+
+function isApiErrorLike(error: unknown): error is { body: ApiErrorBody; message?: string } {
+  if (!error || typeof error !== "object") return false;
+  return "body" in error && typeof (error as { body?: unknown }).body === "object";
+}
+
+function humanizeFieldName(key: string): string {
+  if (key === "non_field_errors") return "Error";
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatErrorValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(formatErrorValue).filter(Boolean).join(" ");
+  }
+
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => {
+        const nestedMessage = formatErrorValue(nestedValue);
+        return nestedMessage ? `${humanizeFieldName(key)}: ${nestedMessage}` : "";
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return "";
 }
 
 function unwrapResults<T>(response: PaginatedResponse<T> | T[]): T[] {
@@ -170,6 +277,10 @@ export const api = {
 
   async getAuction(id: number | string): Promise<Auction> {
     return apiFetch<Auction>(`/auctions/${id}/`);
+  },
+
+  async getManageAuction(id: number | string): Promise<Auction> {
+    return apiFetch<Auction>(`/auctions/${id}/manage/`);
   },
 
   async createAuction(input: CreateAuctionInput): Promise<Auction> {
@@ -314,7 +425,7 @@ export const api = {
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(`${API_BASE_URL}/admin/activity/export/${suffix}`, { headers });
+    const response = await fetch(`${resolveApiBaseUrl()}/admin/activity/export/${suffix}`, { headers });
     if (!response.ok) {
       const isJson = response.headers.get("content-type")?.includes("application/json");
       const body = isJson ? await response.json() : null;

@@ -8,7 +8,7 @@ Phase 1 security hardening turns BIDALS into a safer startup platform baseline. 
 
 - Production settings fail fast when critical environment variables are missing.
 - `DEBUG` is forced off in `bidals.settings.prod`.
-- `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`, and `DJANGO_CSRF_TRUSTED_ORIGINS` are environment driven.
+- `DJANGO_ALLOWED_HOSTS`, CORS origins, and CSRF trusted origins are environment driven.
 - Wildcard CORS is rejected in production.
 - Secure cookies are enabled in production:
   - `SESSION_COOKIE_SECURE=True`
@@ -99,8 +99,8 @@ Critical:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_ALLOWED_HOSTS`
 - `DATABASE_URL` or `DJANGO_DATABASE_URL`
-- `FRONTEND_URL` or `DJANGO_CORS_ALLOWED_ORIGINS`
-- `FRONTEND_URL` or `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `FRONTEND_URL`, `DJANGO_CORS_ALLOWED_ORIGINS`, or `CORS_ALLOWED_ORIGINS`
+- `FRONTEND_URL`, `DJANGO_CSRF_TRUSTED_ORIGINS`, or `CSRF_TRUSTED_ORIGINS`
 
 Recommended security settings:
 
