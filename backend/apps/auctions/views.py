@@ -62,6 +62,7 @@ from apps.auctions.serializers import (
 )
 from apps.auctions.services.bidding import place_bid
 from apps.auctions.services.fulfillment import FulfillmentTransitionError, update_fulfillment_record
+from apps.auctions.services.lifecycle import get_effective_auction_status
 from apps.auctions.services.outcome_repairs import (
     OutcomeRepairError,
     apply_outcome_repair,
@@ -554,6 +555,12 @@ class AuctionViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        server_timestamp = timezone.now()
+        previous = serializer.instance
+        previous_status = previous.status
+        previous_start_time = previous.start_time
+        previous_end_time = previous.end_time
+        previous_effective_status = get_effective_auction_status(previous, now=server_timestamp)
         auction = serializer.save()
         AuditLog.objects.create(
             actor=self.request.user,
@@ -564,8 +571,39 @@ class AuctionViewSet(viewsets.ModelViewSet):
                 "auction_id": auction.id,
                 "updated_fields": sorted(serializer.validated_data.keys()),
                 "status": auction.status,
+                "effective_status": get_effective_auction_status(auction, now=server_timestamp),
             },
         )
+        timing_fields = {"start_time", "end_time"}.intersection(serializer.validated_data)
+        if previous_effective_status == AuctionStatus.LIVE and timing_fields:
+            AuditLog.objects.create(
+                actor=self.request.user,
+                action=AuditAction.SELLER_LIVE_TIMING_UPDATED,
+                entity_type="auction",
+                entity_id=str(auction.id),
+                server_timestamp=server_timestamp,
+                metadata={
+                    "actor": "user",
+                    "auction_id": auction.id,
+                    "lot_id": None,
+                    "previous_state": {
+                        "status": previous_status,
+                        "effective_status": previous_effective_status,
+                        "start_time": previous_start_time.isoformat(),
+                        "end_time": previous_end_time.isoformat(),
+                    },
+                    "new_state": {
+                        "status": auction.status,
+                        "effective_status": get_effective_auction_status(auction, now=server_timestamp),
+                        "start_time": auction.start_time.isoformat(),
+                        "end_time": auction.end_time.isoformat(),
+                    },
+                    "previous_status": previous_status,
+                    "new_status": auction.status,
+                    "reason": "seller_live_timing_edit",
+                    "updated_fields": sorted(timing_fields),
+                },
+            )
 
     @action(detail=True, methods=["get"], permission_classes=(IsAuthenticated,))
     def manage(self, request, pk=None):

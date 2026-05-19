@@ -85,6 +85,7 @@ curl --fail https://<production-backend>/api/health/
 8. Confirm cron jobs still use:
 
 ```bash
+sh /app/scripts/run_scheduled_job.sh open_scheduled_auctions
 sh /app/scripts/run_scheduled_job.sh close_expired_auctions
 sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60
 sh /app/scripts/run_scheduled_job.sh deliver_notifications
@@ -114,7 +115,7 @@ Run at minimum:
 - Confirm bid history.
 - Confirm bid audit logs through `GET /api/lots/{lot_id}/audit/`.
 - Confirm admin export CSV.
-- Confirm cron close/winner job on safe test data or staging mirror.
+- Confirm cron open/close/winner jobs on safe test data or staging mirror.
 - Confirm fulfillment update on test data.
 - Confirm notification unread and mark-read.
 - Confirm repair workflow access.
@@ -130,6 +131,8 @@ For each cron job:
 - Dockerfile Path: `backend/Dockerfile`.
 - Docker Build Context Directory: `backend`.
 - Command uses `/app/scripts/run_scheduled_job.sh`.
+- `open_scheduled_auctions` runs every 1 minute, or every 5 minutes only if that delay is acceptable.
+- `close_expired_auctions` runs every 1 minute, or every 5 minutes only if that delay is acceptable.
 - Env vars copied from backend production env group.
 - Last run succeeded after deploy.
 

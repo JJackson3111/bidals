@@ -506,7 +506,15 @@ Rate-limited response:
 - Frontend state is never trusted for bid acceptance, winner calculation, or permissions.
 - Rate limiting is an abuse-prevention layer only; it does not replace bid validation.
 
-## Auction Ending And Winner Calculation
+## Auction Lifecycle And Winner Calculation
+
+Due scheduled auctions are opened by a backend management command:
+
+```bash
+python manage.py open_scheduled_auctions
+```
+
+The command uses server time only, transitions due `scheduled` auctions to `live` when `start_time <= now < end_time`, skips auctions that are not due or already expired, and is safe to rerun. Bid validation also invokes the same activation path before returning `AUCTION_NOT_LIVE`, so a valid bid at or after the scheduled start can activate the auction server-side without a manual admin status change.
 
 Expired auctions are finalized by a backend management command:
 
@@ -517,12 +525,12 @@ python manage.py close_expired_auctions
 The command:
 
 - uses server time only
-- transitions expired `live` auctions to `ended`
+- transitions expired `live`, legacy `open`, and already elapsed `scheduled` auctions to `ended`
 - locks auction and lot rows while processing
 - calculates winners from accepted bids only
 - records no-bid and reserve-not-met outcomes
-- creates `auction_ended`, `winner_calculated`, notification placeholder, and job-run audit logs
-- is safe to rerun without duplicating winners or winner audit records
+- creates fulfillment records, winner notification records, `auction_ended`, `winner_calculated`, and job-run audit logs
+- is safe to rerun without duplicating winners, fulfillment records, winner notifications, or winner audit records
 
 Winner state is persisted on each lot:
 
@@ -1042,12 +1050,13 @@ python manage.py migrate
 Operational job commands:
 
 ```bash
+python manage.py open_scheduled_auctions
 python manage.py close_expired_auctions
 python manage.py monitor_bid_anomalies --window-minutes 60
 python manage.py deliver_notifications
 ```
 
-Schedule `close_expired_auctions` every minute, or at the shortest interval your provider supports. Schedule `monitor_bid_anomalies` every few minutes. Schedule `deliver_notifications` every few minutes if email delivery is enabled. These commands are idempotent and use backend server time and persisted backend state; they do not trust frontend countdowns.
+Schedule `open_scheduled_auctions` and `close_expired_auctions` every minute, or at the shortest interval your provider supports. A 5-minute cadence is acceptable only if that delay is acceptable for staging/production auction lifecycle transitions. Schedule `monitor_bid_anomalies` every few minutes. Schedule `deliver_notifications` every few minutes if email delivery is enabled. These commands are idempotent and use backend server time and persisted backend state; they do not trust frontend countdowns.
 
 Static files:
 
@@ -1062,10 +1071,11 @@ The backend Docker image already runs `collectstatic` during build. Do not skip 
 BIDALS does not require Celery yet. Use the scheduler provided by your cloud host, cron, or a one-off worker process to run:
 
 ```bash
+python manage.py open_scheduled_auctions
 python manage.py close_expired_auctions
 ```
 
-Recommended cadence: every minute for live auction correctness. The command is idempotent and will skip auctions that are not expired or already finalized.
+Recommended cadence: every minute for live auction correctness. `open_scheduled_auctions` is idempotent and skips auctions that are not due, already live, or already expired. `close_expired_auctions` is idempotent and skips auctions that are not expired or already finalized.
 
 For anomaly monitoring, run:
 
@@ -1104,7 +1114,7 @@ Required env vars for every Render cron job:
 - `DJANGO_ALLOWED_HOSTS=<backend host>`
 - `DATABASE_URL=<managed PostgreSQL URL>` or `DJANGO_DATABASE_URL=<managed PostgreSQL URL>`
 
-These required vars apply to all three scheduled jobs, including `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
+These required vars apply to all scheduled jobs, including `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
 
 Recommended to copy from the backend web service for parity:
 
@@ -1145,6 +1155,7 @@ The runner fails once with a combined missing-var list for the required vars abo
 
 Commands:
 
+- Auction opener: `sh /app/scripts/run_scheduled_job.sh open_scheduled_auctions`
 - Auction closer: `sh /app/scripts/run_scheduled_job.sh close_expired_auctions`
 - Anomaly monitor: `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60`
 - Notification delivery: `sh /app/scripts/run_scheduled_job.sh deliver_notifications`
@@ -1159,6 +1170,7 @@ sh -c 'pwd && ls -l /app/scripts/run_scheduled_job.sh /usr/local/bin/bidals-sche
 
 The older raw commands below are safe for local/manual runs from inside the backend directory, but should not be used as Render cron commands:
 
+- Auction opener: `python manage.py open_scheduled_auctions`
 - Auction closer: `python manage.py close_expired_auctions`
 - Anomaly monitor: `python manage.py monitor_bid_anomalies --window-minutes 60`
 - Notification delivery: `python manage.py deliver_notifications`

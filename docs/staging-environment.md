@@ -61,6 +61,8 @@ The backend also accepts the older `DJANGO_CORS_ALLOWED_ORIGINS` and `DJANGO_CSR
 
 On Render, configure `NEXT_PUBLIC_API_BASE_URL` as both the frontend service environment variable and Docker build argument so Next.js bakes the public backend API URL into client-side bundles. Do not use `http://localhost:8000/api` outside local development.
 
+Frontend static assets are served from `frontend/public` in the deployed Next.js app. Keep the Render frontend staging service on a branch that contains the favicon asset fix; after deploy, `https://bidals-frontend-staging.onrender.com/favicon.ico` should return `200`.
+
 ## Security Expectations
 
 - HTTPS is required for backend and frontend.

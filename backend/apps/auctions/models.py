@@ -57,6 +57,8 @@ class BidStatus(models.TextChoices):
 
 class BidRejectionReason(models.TextChoices):
     AUCTION_NOT_LIVE = "AUCTION_NOT_LIVE", "Auction is not live"
+    AUCTION_NOT_STARTED = "AUCTION_NOT_STARTED", "Auction has not started"
+    AUCTION_ENDED = "AUCTION_ENDED", "Auction has ended"
     LOT_CLOSED = "LOT_CLOSED", "Lot is closed"
     BID_TOO_LOW = "BID_TOO_LOW", "Bid is too low"
     INVALID_INCREMENT = "INVALID_INCREMENT", "Bid increment is invalid"
@@ -106,7 +108,7 @@ class Auction(models.Model):
     def is_live_at(self, timestamp=None) -> bool:
         timestamp = timestamp or timezone.now()
         return (
-            self.status == AuctionStatus.LIVE
+            self.status in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE, "open"}
             and self.start_time <= timestamp
             and self.end_time > timestamp
         )
