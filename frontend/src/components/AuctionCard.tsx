@@ -6,29 +6,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { StatusPill } from "@/components/StatusPill";
+import { getAuctionDisplayState, phaseFromAuctionStatus, type AuctionPhase } from "@/lib/auctionLifecycle";
 import { formatDateTime } from "@/lib/format";
-import type { Auction, AuctionStatus } from "@/lib/types";
-
-type AuctionCardPhase = "scheduled" | "live" | "closed" | "cancelled" | "draft";
-
-type AuctionCardState = {
-  badgeLabel: string;
-  badgeStatus: string;
-  countdownLabel: "Starts in" | "Ends in" | null;
-  ctaLabel: string;
-  phase: AuctionCardPhase;
-  targetTime: string | null;
-};
+import type { Auction } from "@/lib/types";
 
 export function AuctionCard({
   auction,
   onLifecycleBoundary,
 }: {
   auction: Auction;
-  onLifecycleBoundary?: (auction: Auction, phase: AuctionCardPhase) => void;
+  onLifecycleBoundary?: (auction: Auction, phase: AuctionPhase) => void;
 }) {
   const [nowMs, setNowMs] = useState<number | null>(null);
-  const lastObservedPhase = useRef<AuctionCardPhase | null>(null);
+  const lastObservedPhase = useRef<AuctionPhase | null>(null);
   const lastNotifiedKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -40,7 +30,7 @@ export function AuctionCard({
     return () => window.clearInterval(interval);
   }, []);
 
-  const cardState = useMemo(() => getAuctionCardState(auction, nowMs), [auction, nowMs]);
+  const cardState = useMemo(() => getAuctionDisplayState(auction, nowMs), [auction, nowMs]);
 
   useEffect(() => {
     if (nowMs === null) return;
@@ -95,87 +85,4 @@ export function AuctionCard({
       </Link>
     </article>
   );
-}
-
-function getAuctionCardState(auction: Auction, nowMs: number | null): AuctionCardState {
-  const phase = getAuctionPhase(auction, nowMs);
-
-  if (phase === "scheduled") {
-    return {
-      badgeLabel: "Scheduled",
-      badgeStatus: "scheduled",
-      countdownLabel: "Starts in",
-      ctaLabel: "Preview auction",
-      phase,
-      targetTime: auction.start_time,
-    };
-  }
-
-  if (phase === "live") {
-    return {
-      badgeLabel: "Live",
-      badgeStatus: "live",
-      countdownLabel: "Ends in",
-      ctaLabel: "Open auction",
-      phase,
-      targetTime: auction.end_time,
-    };
-  }
-
-  if (phase === "closed") {
-    return {
-      badgeLabel: "Closed",
-      badgeStatus: "closed",
-      countdownLabel: null,
-      ctaLabel: "View auction",
-      phase,
-      targetTime: null,
-    };
-  }
-
-  if (phase === "cancelled") {
-    return {
-      badgeLabel: "Cancelled",
-      badgeStatus: "cancelled",
-      countdownLabel: null,
-      ctaLabel: "View auction",
-      phase,
-      targetTime: null,
-    };
-  }
-
-  return {
-    badgeLabel: "Draft",
-    badgeStatus: "draft",
-    countdownLabel: null,
-    ctaLabel: "View auction",
-    phase,
-    targetTime: null,
-  };
-}
-
-function getAuctionPhase(auction: Auction, nowMs: number | null): AuctionCardPhase {
-  const statusPhase = phaseFromAuctionStatus(auction.status);
-  if (statusPhase === "cancelled" || statusPhase === "draft" || statusPhase === "closed") {
-    return statusPhase;
-  }
-
-  const startMs = new Date(auction.start_time).getTime();
-  const endMs = new Date(auction.end_time).getTime();
-  if (nowMs === null || !Number.isFinite(startMs) || !Number.isFinite(endMs)) {
-    return statusPhase ?? "closed";
-  }
-
-  if (nowMs >= endMs) return "closed";
-  if (nowMs >= startMs) return "live";
-  return "scheduled";
-}
-
-function phaseFromAuctionStatus(status: AuctionStatus | string): AuctionCardPhase | null {
-  if (status === "scheduled") return "scheduled";
-  if (status === "live" || status === "open") return "live";
-  if (status === "ended" || status === "closed") return "closed";
-  if (status === "cancelled") return "cancelled";
-  if (status === "draft") return "draft";
-  return null;
 }
