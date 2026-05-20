@@ -32,18 +32,22 @@ def apply_allowed_in_current_environment() -> bool:
 
 def plan_lifecycle_repairs(*, now=None, lock_rows: bool = False) -> list[RepairOperation]:
     now = now or timezone.now()
+    # Retain lock_rows for compatibility with older callers, but planning is
+    # intentionally unlocked. Apply mode locks concrete target rows by primary
+    # key before revalidating and writing.
+    _ = lock_rows
     operations = []
-    operations.extend(plan_auction_status_repairs(now=now, lock_rows=lock_rows))
-    operations.extend(plan_sold_lot_winner_repairs(now=now, lock_rows=lock_rows))
+    operations.extend(plan_auction_status_repairs(now=now))
+    operations.extend(plan_sold_lot_winner_repairs(now=now))
     return operations
 
 
 def apply_lifecycle_repairs(*, now=None) -> list[RepairOperation]:
     now = now or timezone.now()
+    candidate_operations = plan_lifecycle_repairs(now=now)
     with transaction.atomic():
-        operations = plan_lifecycle_repairs(now=now, lock_rows=True)
         applied = []
-        for operation in operations:
+        for operation in candidate_operations:
             if operation.status != "planned":
                 applied.append(operation)
                 continue
@@ -57,10 +61,8 @@ def apply_lifecycle_repairs(*, now=None) -> list[RepairOperation]:
         return applied
 
 
-def plan_auction_status_repairs(*, now, lock_rows: bool) -> list[RepairOperation]:
+def plan_auction_status_repairs(*, now) -> list[RepairOperation]:
     queryset = Auction.objects.filter(status__in=LIVE_AUCTION_STATUS_ALIASES).order_by("id")
-    if lock_rows:
-        queryset = queryset.select_for_update()
 
     operations = []
     for auction in queryset:
@@ -83,7 +85,7 @@ def plan_auction_status_repairs(*, now, lock_rows: bool) -> list[RepairOperation
     return operations
 
 
-def plan_sold_lot_winner_repairs(*, now, lock_rows: bool) -> list[RepairOperation]:
+def plan_sold_lot_winner_repairs(*, now) -> list[RepairOperation]:
     queryset = (
         Lot.objects.select_related("auction", "winner", "winning_bid")
         .filter(status=LotStatus.SOLD)
@@ -94,8 +96,6 @@ def plan_sold_lot_winner_repairs(*, now, lock_rows: bool) -> list[RepairOperatio
         )
         .order_by("auction_id", "id")
     )
-    if lock_rows:
-        queryset = queryset.select_for_update()
 
     operations = []
     for lot in queryset:
@@ -179,11 +179,16 @@ def apply_auction_status_repair(*, operation: RepairOperation, now) -> RepairOpe
 
 
 def apply_sold_lot_winner_repair(*, operation: RepairOperation, now) -> RepairOperation:
-    lot = (
-        Lot.objects.select_for_update()
-        .select_related("auction", "winner", "winning_bid")
-        .get(pk=operation.target_id)
+    planned_auction_id = operation.before.get("auction_id")
+    auction = (
+        Auction.objects.select_for_update().get(pk=planned_auction_id)
+        if planned_auction_id
+        else None
     )
+    lot = Lot.objects.select_for_update().get(pk=operation.target_id)
+    if auction is None or lot.auction_id != auction.pk:
+        auction = Auction.objects.select_for_update().get(pk=lot.auction_id)
+    lot.auction = auction
     effective_auction_status = get_effective_auction_status(lot.auction, now=now)
     before = lot_snapshot(lot, effective_auction_status=effective_auction_status)
     if not sold_lot_needs_winner_repair(lot):

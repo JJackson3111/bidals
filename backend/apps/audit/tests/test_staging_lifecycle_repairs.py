@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from apps.accounts.models import UserRole
@@ -120,6 +121,36 @@ def test_staging_repair_lifecycle_issues_repairs_sold_lot_missing_winner(monkeyp
         metadata__repair_action="set_sold_lot_winner_from_highest_accepted_bid",
     ).exists()
     assert "winner_seller@example.com" not in output.getvalue()
+
+
+def test_staging_repair_lifecycle_issues_apply_locks_lots_without_nullable_joins(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    seller = create_user("lock_shape_seller", role=UserRole.SELLER)
+    bidder = create_user("lock_shape_bidder")
+    auction = create_effectively_ended_live_auction(seller=seller)
+    lot = create_sold_lot_missing_winner(auction=auction)
+    Bid.objects.create(lot=lot, bidder=bidder, amount=Decimal("125.00"), status=BidStatus.ACCEPTED)
+    locked_lot_query_shapes = []
+    original_select_for_update = QuerySet.select_for_update
+    original_select_related = QuerySet.select_related
+
+    def guarded_select_for_update(self, *args, **kwargs):
+        if self.model is Lot:
+            locked_lot_query_shapes.append(self.query.select_related)
+            assert not self.query.select_related
+        return original_select_for_update(self, *args, **kwargs)
+
+    def guarded_select_related(self, *fields):
+        if self.model is Lot and self.query.select_for_update:
+            raise AssertionError("Locked Lot querysets must not add select_related joins")
+        return original_select_related(self, *fields)
+
+    monkeypatch.setattr(QuerySet, "select_for_update", guarded_select_for_update)
+    monkeypatch.setattr(QuerySet, "select_related", guarded_select_related)
+
+    call_command("staging_repair_lifecycle_issues", apply=True)
+
+    assert locked_lot_query_shapes
 
 
 def test_staging_repair_lifecycle_issues_repairs_live_stored_ended_effective_auction(monkeypatch):
