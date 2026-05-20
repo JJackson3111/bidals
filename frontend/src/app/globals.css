@@ -606,7 +606,7 @@ p {
 }
 
 .card-title-row {
-  align-items: start;
+  align-items: flex-start;
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -619,7 +619,7 @@ p {
 
 .hero-lot-meta,
 .auction-preview-footer {
-  align-items: end;
+  align-items: flex-end;
   display: flex;
   gap: 14px;
   justify-content: space-between;
@@ -1429,7 +1429,7 @@ p {
 }
 
 .auction-progress-header {
-  align-items: start;
+  align-items: flex-start;
   display: flex;
   gap: 14px;
   justify-content: space-between;
@@ -2494,7 +2494,679 @@ p {
   padding: 10px;
 }
 
+.browse-page {
+  background: #fafbf8;
+  color: var(--ink);
+  min-height: calc(100vh - 64px);
+  padding-bottom: 78px;
+}
+
+.browse-container {
+  margin: 0 auto;
+  max-width: 1280px;
+  width: min(100%, calc(100vw - 32px));
+}
+
+.browse-hero {
+  background: linear-gradient(180deg, #fbfcfa 0%, #f3f7f1 100%);
+  padding: 64px 0 36px;
+}
+
+.browse-hero .browse-container {
+  display: grid;
+  gap: 30px;
+}
+
+.browse-hero-copy {
+  display: grid;
+  gap: 16px;
+  max-width: 820px;
+}
+
+.browse-eyebrow {
+  letter-spacing: 0.08em;
+}
+
+.browse-hero h1 {
+  font-size: 3.15rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.browse-hero p {
+  color: #52615b;
+  font-size: 1.08rem;
+  line-height: 1.7;
+  max-width: 720px;
+}
+
+.browse-hero-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  max-width: 620px;
+}
+
+.browse-hero-stats div {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(23, 33, 30, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(23, 33, 30, 0.06);
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  padding: 16px;
+}
+
+.browse-hero-stats dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.browse-hero-stats dd {
+  color: var(--ink);
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+}
+
+.browse-toolbar {
+  padding: 28px 0 26px;
+}
+
+.browse-toolbar .browse-container {
+  display: grid;
+  gap: 18px;
+}
+
+.browse-search {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(23, 33, 30, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(23, 33, 30, 0.05);
+  color: #5d6b66;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  max-width: 620px;
+  min-height: 56px;
+  padding: 0 16px;
+}
+
+.browse-search input {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  min-height: 54px;
+  outline: 0;
+  padding: 0 0 0 10px;
+  width: 100%;
+}
+
+.browse-search:focus-within {
+  border-color: rgba(206, 251, 4, 0.72);
+  box-shadow: 0 0 0 4px rgba(206, 251, 4, 0.16), 0 10px 24px rgba(23, 33, 30, 0.06);
+}
+
+.browse-sr-only {
+  clip: rect(0 0 0 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.browse-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.browse-filter-button {
+  background: #fff;
+  border: 1px solid rgba(23, 33, 30, 0.1);
+  border-radius: 999px;
+  color: #52615b;
+  font-size: 0.9rem;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 9px 16px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.browse-filter-button:hover,
+.browse-filter-button.is-active {
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  box-shadow: 0 8px 18px rgba(23, 33, 30, 0.1);
+  color: var(--ink);
+}
+
+.browse-soft-alert {
+  background: #fff9e8;
+  border: 1px solid #efdca8;
+  border-radius: 8px;
+  color: #6f4f15;
+  font-size: 0.92rem;
+  padding: 12px 14px;
+}
+
+.browse-results {
+  padding: 0 0 20px;
+}
+
+.browse-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.browse-auction-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(23, 33, 30, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(23, 33, 30, 0.08);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.browse-card-media {
+  aspect-ratio: 16 / 10;
+  background:
+    linear-gradient(135deg, rgba(206, 251, 4, 0.18), rgba(255, 255, 255, 0.12)),
+    linear-gradient(145deg, #121917, #3d4943);
+  min-height: 250px;
+  overflow: hidden;
+  position: relative;
+}
+
+.browse-card-image,
+.browse-card-placeholder,
+.browse-media-overlay {
+  inset: 0;
+  position: absolute;
+}
+
+.browse-card-image {
+  background-position: center;
+  background-size: cover;
+  transform: scale(1);
+  transition: transform 240ms ease;
+  z-index: 1;
+}
+
+.browse-card-placeholder {
+  align-items: center;
+  color: rgba(255, 255, 255, 0.82);
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 26px;
+  text-align: center;
+  z-index: 1;
+}
+
+.browse-card-placeholder span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  font-weight: 800;
+  max-width: 24ch;
+}
+
+.browse-card-placeholder::before {
+  background:
+    radial-gradient(circle at 28% 26%, rgba(255, 255, 255, 0.14), transparent 18%),
+    radial-gradient(circle at 72% 70%, rgba(206, 251, 4, 0.18), transparent 22%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 18px);
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.browse-media-overlay {
+  background:
+    linear-gradient(180deg, rgba(23, 33, 30, 0.34), rgba(23, 33, 30, 0.1) 34%, rgba(23, 33, 30, 0.38)),
+    linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.12) 100%);
+  z-index: 2;
+}
+
+.browse-lots-badge,
+.browse-image-count,
+.browse-status-badge {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 10px;
+  position: absolute;
+  z-index: 3;
+}
+
+.browse-lots-badge,
+.browse-image-count {
+  background: rgba(23, 33, 30, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  top: 14px;
+}
+
+.browse-lots-badge {
+  left: 14px;
+}
+
+.browse-image-count {
+  right: 14px;
+}
+
+.browse-status-badge {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--ink);
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+}
+
+.browse-status-badge.is-live {
+  background: rgba(206, 251, 4, 0.94);
+}
+
+.browse-status-badge.is-closed,
+.browse-status-badge.is-cancelled,
+.browse-status-badge.is-draft {
+  background: rgba(255, 255, 255, 0.84);
+  color: #5d6b66;
+}
+
+.browse-live-dot {
+  animation: browse-live-pulse 1.4s ease-in-out infinite;
+  background: var(--ink);
+  border-radius: 999px;
+  height: 7px;
+  width: 7px;
+}
+
+.browse-media-controls {
+  display: flex;
+  inset: 50% 12px auto;
+  justify-content: space-between;
+  position: absolute;
+  transform: translateY(-50%);
+  z-index: 4;
+}
+
+.browse-media-controls button {
+  align-items: center;
+  background: rgba(23, 33, 30, 0.54);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  opacity: 0.92;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+  width: 38px;
+}
+
+.browse-card-body {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.browse-card-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.browse-card-title-link h2 {
+  font-size: 1.28rem;
+  font-weight: 800;
+  line-height: 1.12;
+}
+
+.browse-card-title-link:hover {
+  color: #0f1714;
+}
+
+.browse-card-heading p {
+  color: #5d6b66;
+  display: -webkit-box;
+  font-size: 0.96rem;
+  line-height: 1.6;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.browse-value-row {
+  align-items: flex-end;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.browse-value-row span,
+.browse-bid-module-header span,
+.browse-bid-module-header small,
+.browse-bid-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.browse-value-row strong {
+  color: var(--ink);
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.browse-time-pill {
+  align-items: center;
+  background: rgba(244, 247, 246, 0.88);
+  border: 1px solid rgba(23, 33, 30, 0.07);
+  border-radius: 999px;
+  color: #52615b;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 6px;
+  justify-content: flex-end;
+  max-width: 50%;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.browse-signal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.browse-signal-grid span {
+  align-items: center;
+  background: rgba(244, 247, 246, 0.86);
+  border: 1px solid rgba(23, 33, 30, 0.08);
+  border-radius: 999px;
+  color: #52615b;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 6px;
+  min-height: 32px;
+  padding: 7px 10px;
+}
+
+.browse-signal-grid span.is-accent {
+  background: rgba(206, 251, 4, 0.14);
+  border-color: rgba(206, 251, 4, 0.42);
+  color: var(--ink);
+}
+
+.browse-bid-module {
+  border-top: 1px solid rgba(23, 33, 30, 0.08);
+  display: grid;
+  gap: 11px;
+  padding-top: 16px;
+}
+
+.browse-bid-module-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.browse-bid-controls {
+  align-items: flex-end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+}
+
+.browse-bid-controls button {
+  align-items: center;
+  background: #f3f6f1;
+  border: 1px solid rgba(23, 33, 30, 0.08);
+  border-radius: 8px;
+  color: var(--ink);
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+  width: 42px;
+}
+
+.browse-bid-controls button:hover:not(:disabled) {
+  background: rgba(206, 251, 4, 0.18);
+  border-color: rgba(206, 251, 4, 0.5);
+}
+
+.browse-bid-input {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.browse-bid-input span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.browse-bid-input input {
+  background: #fff;
+  border: 1px solid #ccd6cf;
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 800;
+  height: 42px;
+  min-width: 0;
+  padding: 8px 10px;
+  text-align: center;
+  width: 100%;
+}
+
+.browse-primary-bid,
+.browse-open-link {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 46px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.browse-primary-bid {
+  background: var(--brand-green);
+  border: 1px solid var(--brand-green);
+  box-shadow: 0 9px 18px rgba(23, 33, 30, 0.1);
+  color: var(--ink);
+  width: 100%;
+}
+
+.browse-primary-bid:disabled {
+  background: #eef1ed;
+  border-color: rgba(23, 33, 30, 0.08);
+  box-shadow: none;
+  color: #77847f;
+}
+
+.browse-open-link {
+  background: #f3f6f1;
+  border: 1px solid rgba(23, 33, 30, 0.08);
+  color: var(--ink);
+  gap: 8px;
+}
+
+@keyframes browse-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.54;
+    transform: scale(0.72);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .browse-auction-card:hover {
+    border-color: rgba(206, 251, 4, 0.42);
+    box-shadow: 0 26px 56px rgba(23, 33, 30, 0.13), 0 0 0 1px rgba(206, 251, 4, 0.14);
+    transform: translateY(-3px);
+  }
+
+  .browse-auction-card:hover .browse-card-image {
+    transform: scale(1.035);
+  }
+
+  .browse-media-controls button:hover,
+  .browse-media-controls button:focus-visible {
+    background: rgba(23, 33, 30, 0.72);
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  .browse-bid-controls button:hover:not(:disabled),
+  .browse-primary-bid:hover,
+  .browse-open-link:hover {
+    transform: translateY(-1px);
+  }
+
+  .browse-primary-bid:hover {
+    background: var(--brand-green-hover);
+    border-color: var(--brand-green);
+    box-shadow: 0 12px 24px rgba(23, 33, 30, 0.14);
+  }
+
+  .browse-open-link:hover {
+    background: rgba(206, 251, 4, 0.16);
+    border-color: rgba(206, 251, 4, 0.5);
+  }
+}
+
+@media (max-width: 560px) {
+  .browse-container {
+    width: min(100%, calc(100vw - 28px));
+  }
+
+  .browse-hero {
+    padding: 48px 0 30px;
+  }
+
+  .browse-hero h1 {
+    font-size: 2.65rem;
+  }
+
+  .browse-hero-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .browse-card-media {
+    min-height: 230px;
+  }
+
+  .browse-value-row {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .browse-time-pill {
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+
+  .browse-bid-module-header {
+    align-items: flex-start;
+    display: grid;
+    gap: 4px;
+  }
+}
+
+@media (min-width: 720px) {
+  .browse-hero {
+    padding: 78px 0 42px;
+  }
+
+  .browse-hero h1 {
+    font-size: 4.75rem;
+  }
+
+  .browse-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1080px) {
+  .browse-hero .browse-container {
+    align-items: flex-end;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.56fr);
+  }
+
+  .browse-hero h1 {
+    font-size: 5.8rem;
+  }
+
+  .browse-hero-stats {
+    justify-self: end;
+  }
+
+  .browse-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .browse-auction-card,
+  .browse-card-image,
+  .browse-filter-button,
+  .browse-media-controls button,
+  .browse-live-dot,
+  .browse-bid-controls button,
+  .browse-primary-bid,
+  .browse-open-link,
   .hero-lot-card,
   .auction-preview-card,
   .media-art,
@@ -2519,6 +3191,17 @@ p {
   .auction-card-cta {
     animation: none;
     transition: none;
+  }
+
+  .browse-live-dot,
+  .browse-auction-card:hover,
+  .browse-auction-card:hover .browse-card-image,
+  .browse-filter-button:hover,
+  .browse-media-controls button:hover,
+  .browse-bid-controls button:hover,
+  .browse-primary-bid:hover,
+  .browse-open-link:hover {
+    transform: none;
   }
 
   .auction-progress-fill {

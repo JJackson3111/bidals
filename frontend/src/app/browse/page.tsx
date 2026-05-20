@@ -1,5 +1,5 @@
 import { BrowseAuctionsExperience } from "@/components/BrowseAuctionsExperience";
 
-export default function AuctionsPage() {
+export default function BrowsePage() {
   return <BrowseAuctionsExperience />;
 }
