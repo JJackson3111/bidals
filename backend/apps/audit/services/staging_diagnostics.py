@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.management import get_commands
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
-from django.db.models import F, Q
+from django.db.models import Count, F, Q
 from django.utils import timezone
 
 from apps.auctions.models import Auction, Lot, LotStatus, LotWinnerStatus
@@ -19,6 +19,8 @@ from apps.auctions.services.lifecycle import (
     ENDED_AUCTION_STATUS_ALIASES,
     LIVE_AUCTION_STATUS_ALIASES,
     SCHEDULED_AUCTION_STATUSES,
+    get_effective_auction_status,
+    get_effective_lot_status,
 )
 
 NOT_CONFIGURED = "not configured"
@@ -137,6 +139,49 @@ def collect_staging_lifecycle_readiness() -> list[ReadinessLine]:
         zero_count_check("CLOSED_LOTS_IN_LIVE_AUCTIONS", counts.get("closed_lots_in_live_auctions"), counts_error),
         zero_count_check("AUCTIONS_START_AFTER_END", counts.get("auctions_start_after_end"), counts_error),
     ]
+
+
+def collect_staging_lifecycle_issue_details() -> dict:
+    errors = []
+    try:
+        lots = [
+            lot_issue_detail(lot)
+            for lot in (
+                Lot.objects.select_related("auction", "winner", "winning_bid")
+                .annotate(bid_count=Count("bids", distinct=True))
+                .filter(inconsistent_lot_query())
+                .order_by("auction_id", "id")
+            )
+        ]
+    except Exception as exc:
+        lots = []
+        errors.append({"section": "lot_issues", "error_type": exc.__class__.__name__})
+
+    try:
+        auctions = [
+            auction_issue_detail(auction, reason="auction_start_after_end")
+            for auction in Auction.objects.filter(start_time__gt=F("end_time")).order_by("id")
+        ]
+    except Exception as exc:
+        auctions = []
+        errors.append({"section": "auction_issues", "error_type": exc.__class__.__name__})
+
+    return {
+        "generated_at": timezone.now().isoformat(),
+        "summary": {
+            "inconsistent_lots": sum("inconsistent_lot" in lot["reason_groups"] for lot in lots),
+            "closed_lots_in_live_auctions": sum(
+                "closed_lot_inside_live_auction" in lot["reasons"] for lot in lots
+            ),
+            "live_lots_in_closed_auctions": sum(
+                "live_lot_inside_closed_auction" in lot["reasons"] for lot in lots
+            ),
+            "auctions_start_after_end": len(auctions),
+        },
+        "lot_issues": lots,
+        "auction_issues": auctions,
+        "errors": errors,
+    }
 
 
 def mask_url(value: str | None) -> str:
@@ -261,37 +306,15 @@ def get_applied_migrations() -> set[tuple[str, str]]:
 
 
 def lifecycle_counts() -> dict[str, int]:
-    closed_lot_statuses = (LotStatus.CLOSED, LotStatus.SOLD)
-    sold_without_winner = Q(status=LotStatus.SOLD) & (
-        Q(winner_id__isnull=True)
-        | Q(winning_bid_id__isnull=True)
-        | ~Q(winner_status=LotWinnerStatus.WINNER_ASSIGNED)
-    )
-    winner_assigned_without_links = Q(winner_status=LotWinnerStatus.WINNER_ASSIGNED) & (
-        Q(winner_id__isnull=True) | Q(winning_bid_id__isnull=True)
-    )
-    open_lot_with_outcome = Q(status=LotStatus.OPEN) & (
-        Q(winner_id__isnull=False)
-        | Q(winning_bid_id__isnull=False)
-        | ~Q(winner_status=LotWinnerStatus.PENDING)
-        | Q(winner_calculated_at__isnull=False)
-    )
-
     live_lots_in_closed_auctions = Lot.objects.filter(
         auction__status__in=ENDED_AUCTION_STATUS_ALIASES,
         status=LotStatus.OPEN,
     ).count()
     closed_lots_in_live_auctions = Lot.objects.filter(
         auction__status__in=LIVE_AUCTION_STATUS_ALIASES,
-        status__in=closed_lot_statuses,
+        status__in=closed_lot_statuses(),
     ).count()
-    detected_inconsistent_lots = Lot.objects.filter(
-        sold_without_winner
-        | winner_assigned_without_links
-        | open_lot_with_outcome
-        | Q(auction__status__in=ENDED_AUCTION_STATUS_ALIASES, status=LotStatus.OPEN)
-        | Q(auction__status__in=LIVE_AUCTION_STATUS_ALIASES, status__in=closed_lot_statuses)
-    ).count()
+    detected_inconsistent_lots = Lot.objects.filter(inconsistent_lot_query()).count()
 
     return {
         "scheduled_auctions": Auction.objects.filter(status__in=SCHEDULED_AUCTION_STATUSES).count(),
@@ -302,6 +325,167 @@ def lifecycle_counts() -> dict[str, int]:
         "closed_lots_in_live_auctions": closed_lots_in_live_auctions,
         "auctions_start_after_end": Auction.objects.filter(start_time__gt=F("end_time")).count(),
     }
+
+
+def closed_lot_statuses() -> tuple[str, ...]:
+    return (LotStatus.CLOSED, LotStatus.SOLD)
+
+
+def inconsistent_lot_reason_queries() -> tuple[tuple[str, Q], ...]:
+    return (
+        (
+            "sold_lot_missing_winner_or_winning_bid",
+            Q(status=LotStatus.SOLD)
+            & (
+                Q(winner_id__isnull=True)
+                | Q(winning_bid_id__isnull=True)
+                | ~Q(winner_status=LotWinnerStatus.WINNER_ASSIGNED)
+            ),
+        ),
+        (
+            "winner_assigned_missing_winner_or_winning_bid",
+            Q(winner_status=LotWinnerStatus.WINNER_ASSIGNED)
+            & (Q(winner_id__isnull=True) | Q(winning_bid_id__isnull=True)),
+        ),
+        (
+            "open_lot_has_outcome_data",
+            Q(status=LotStatus.OPEN)
+            & (
+                Q(winner_id__isnull=False)
+                | Q(winning_bid_id__isnull=False)
+                | ~Q(winner_status=LotWinnerStatus.PENDING)
+                | Q(winner_calculated_at__isnull=False)
+            ),
+        ),
+        (
+            "live_lot_inside_closed_auction",
+            Q(auction__status__in=ENDED_AUCTION_STATUS_ALIASES, status=LotStatus.OPEN),
+        ),
+        (
+            "closed_lot_inside_live_auction",
+            Q(auction__status__in=LIVE_AUCTION_STATUS_ALIASES, status__in=closed_lot_statuses()),
+        ),
+    )
+
+
+def inconsistent_lot_query() -> Q:
+    combined = Q(pk__in=[])
+    for _reason, query in inconsistent_lot_reason_queries():
+        combined |= query
+    return combined
+
+
+def lot_issue_reasons(lot: Lot) -> list[str]:
+    reasons = []
+    if lot.status == LotStatus.SOLD and (
+        not lot.winner_id
+        or not lot.winning_bid_id
+        or lot.winner_status != LotWinnerStatus.WINNER_ASSIGNED
+    ):
+        reasons.append("sold_lot_missing_winner_or_winning_bid")
+    if lot.winner_status == LotWinnerStatus.WINNER_ASSIGNED and (
+        not lot.winner_id or not lot.winning_bid_id
+    ):
+        reasons.append("winner_assigned_missing_winner_or_winning_bid")
+    if lot.status == LotStatus.OPEN and (
+        lot.winner_id
+        or lot.winning_bid_id
+        or lot.winner_status != LotWinnerStatus.PENDING
+        or lot.winner_calculated_at
+    ):
+        reasons.append("open_lot_has_outcome_data")
+    if lot.auction.status in ENDED_AUCTION_STATUS_ALIASES and lot.status == LotStatus.OPEN:
+        reasons.append("live_lot_inside_closed_auction")
+    if lot.auction.status in LIVE_AUCTION_STATUS_ALIASES and lot.status in closed_lot_statuses():
+        reasons.append("closed_lot_inside_live_auction")
+    return reasons
+
+
+def lot_issue_detail(lot: Lot) -> dict:
+    reasons = lot_issue_reasons(lot)
+    return {
+        "record_type": "lot",
+        "reason_groups": ["inconsistent_lot"],
+        "reasons": reasons,
+        "auction_id": lot.auction_id,
+        "auction_title": lot.auction.title,
+        "auction_status": lot.auction.status,
+        "auction_effective_status": safe_effective_auction_status(lot.auction),
+        "auction_start_time": iso_or_none(lot.auction.start_time),
+        "auction_end_time": iso_or_none(lot.auction.end_time),
+        "auction_created_at": iso_or_none(getattr(lot.auction, "created_at", None)),
+        "auction_updated_at": iso_or_none(getattr(lot.auction, "updated_at", None)),
+        "lot_id": lot.id,
+        "lot_title": lot.title,
+        "lot_status": lot.status,
+        "lot_effective_status": safe_effective_lot_status(lot),
+        "current_price": str(lot.current_price) if lot.current_price is not None else None,
+        "winning_bid_id": lot.winning_bid_id,
+        "winner_id": lot.winner_id,
+        "winner_email": mask_email(getattr(lot.winner, "email", "")) if lot.winner_id else None,
+        "winner_status": lot.winner_status,
+        "bid_count": getattr(lot, "bid_count", None),
+        "created_at": iso_or_none(getattr(lot, "created_at", None)),
+        "updated_at": iso_or_none(getattr(lot, "updated_at", None)),
+    }
+
+
+def auction_issue_detail(auction: Auction, *, reason: str) -> dict:
+    return {
+        "record_type": "auction",
+        "reasons": [reason],
+        "auction_id": auction.id,
+        "auction_title": auction.title,
+        "auction_status": auction.status,
+        "auction_effective_status": safe_effective_auction_status(auction),
+        "auction_start_time": iso_or_none(auction.start_time),
+        "auction_end_time": iso_or_none(auction.end_time),
+        "auction_created_at": iso_or_none(getattr(auction, "created_at", None)),
+        "auction_updated_at": iso_or_none(getattr(auction, "updated_at", None)),
+        "lot_id": None,
+        "lot_title": None,
+        "lot_status": None,
+        "lot_effective_status": None,
+        "current_price": None,
+        "winning_bid_id": None,
+        "winner_id": None,
+        "winner_email": None,
+        "winner_status": None,
+        "bid_count": None,
+        "created_at": iso_or_none(getattr(auction, "created_at", None)),
+        "updated_at": iso_or_none(getattr(auction, "updated_at", None)),
+    }
+
+
+def safe_effective_auction_status(auction: Auction) -> str:
+    try:
+        return get_effective_auction_status(auction)
+    except Exception as exc:
+        return f"unavailable ({exc.__class__.__name__})"
+
+
+def safe_effective_lot_status(lot: Lot) -> str:
+    try:
+        return get_effective_lot_status(lot)
+    except Exception as exc:
+        return f"unavailable ({exc.__class__.__name__})"
+
+
+def iso_or_none(value) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def mask_email(value: str | None) -> str | None:
+    if not value:
+        return None
+    if "@" not in value:
+        return "***"
+    local, domain = value.split("@", 1)
+    if not local:
+        return f"***@{domain}"
+    return f"{local[:1]}***@{domain}"
 
 
 def safe_database_name(value) -> str:
