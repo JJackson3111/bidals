@@ -54,6 +54,21 @@ def create_sold_lot_missing_winner(*, auction):
     )
 
 
+def create_open_lot_in_ended_auction(*, auction):
+    return Lot.objects.create(
+        auction=auction,
+        title="Open Lot In Ended Auction",
+        description="A staging open lot whose auction has already ended.",
+        starting_price=Decimal("80.00"),
+        current_price=Decimal("80.00"),
+        bid_increment=Decimal("5.00"),
+        status=LotStatus.OPEN,
+        winner=None,
+        winning_bid=None,
+        winner_status=LotWinnerStatus.PENDING,
+    )
+
+
 def test_staging_repair_lifecycle_issues_dry_run_writes_nothing(monkeypatch):
     monkeypatch.delenv("ENVIRONMENT", raising=False)
     monkeypatch.delenv("RENDER_SERVICE_NAME", raising=False)
@@ -61,7 +76,9 @@ def test_staging_repair_lifecycle_issues_dry_run_writes_nothing(monkeypatch):
     bidder = create_user("dry_bidder")
     auction = create_effectively_ended_live_auction(seller=seller)
     lot = create_sold_lot_missing_winner(auction=auction)
+    open_lot = create_open_lot_in_ended_auction(auction=auction)
     Bid.objects.create(lot=lot, bidder=bidder, amount=Decimal("125.00"), status=BidStatus.ACCEPTED)
+    Bid.objects.create(lot=open_lot, bidder=bidder, amount=Decimal("90.00"), status=BidStatus.ACCEPTED)
     before = repair_snapshot()
     output = StringIO()
 
@@ -72,6 +89,7 @@ def test_staging_repair_lifecycle_issues_dry_run_writes_nothing(monkeypatch):
     assert "No data was modified." in rendered
     assert "set_auction_status_ended" in rendered
     assert "set_sold_lot_winner_from_highest_accepted_bid" in rendered
+    assert "finalise_open_lot_in_ended_auction" in rendered
     assert repair_snapshot() == before
 
 
@@ -171,13 +189,75 @@ def test_staging_repair_lifecycle_issues_repairs_live_stored_ended_effective_auc
     ).exists()
 
 
+def test_staging_repair_lifecycle_issues_finalises_open_lot_with_accepted_bid(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    seller = create_user("open_winner_seller", role=UserRole.SELLER)
+    low_bidder = create_user("open_low_bidder")
+    high_bidder = create_user("open_high_bidder")
+    auction = create_effectively_ended_live_auction(seller=seller)
+    auction.status = AuctionStatus.ENDED
+    auction.save(update_fields=("status", "updated_at"))
+    lot = create_open_lot_in_ended_auction(auction=auction)
+    low_bid = Bid.objects.create(lot=lot, bidder=low_bidder, amount=Decimal("90.00"), status=BidStatus.ACCEPTED)
+    high_bid = Bid.objects.create(lot=lot, bidder=high_bidder, amount=Decimal("110.00"), status=BidStatus.ACCEPTED)
+
+    call_command("staging_repair_lifecycle_issues", apply=True)
+
+    lot.refresh_from_db()
+    low_bid.refresh_from_db()
+    high_bid.refresh_from_db()
+    assert lot.status == LotStatus.SOLD
+    assert lot.winning_bid == high_bid
+    assert lot.winner == high_bidder
+    assert lot.winner_status == LotWinnerStatus.WINNER_ASSIGNED
+    assert lot.winner_calculated_at is not None
+    assert low_bid.amount == Decimal("90.00")
+    assert high_bid.amount == Decimal("110.00")
+    assert AuditLog.objects.filter(
+        action=AuditAction.ADMIN_ACTION,
+        entity_type="lot",
+        entity_id=str(lot.id),
+        metadata__source="staging_repair_lifecycle_issues",
+        metadata__repair_action="finalise_open_lot_in_ended_auction",
+    ).exists()
+
+
+def test_staging_repair_lifecycle_issues_finalises_open_lot_without_valid_bid_as_closed(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    seller = create_user("open_no_bid_seller", role=UserRole.SELLER)
+    rejected_bidder = create_user("open_rejected_bidder")
+    auction = create_effectively_ended_live_auction(seller=seller)
+    auction.status = AuctionStatus.ENDED
+    auction.save(update_fields=("status", "updated_at"))
+    lot = create_open_lot_in_ended_auction(auction=auction)
+    Bid.objects.create(lot=lot, bidder=rejected_bidder, amount=Decimal("90.00"), status=BidStatus.REJECTED)
+
+    call_command("staging_repair_lifecycle_issues", apply=True)
+
+    lot.refresh_from_db()
+    assert lot.status == LotStatus.CLOSED
+    assert lot.winner_id is None
+    assert lot.winning_bid_id is None
+    assert lot.winner_status == LotWinnerStatus.NO_BIDS
+    assert lot.winner_calculated_at is not None
+    assert AuditLog.objects.filter(
+        action=AuditAction.ADMIN_ACTION,
+        entity_type="lot",
+        entity_id=str(lot.id),
+        metadata__source="staging_repair_lifecycle_issues",
+        metadata__repair_action="finalise_open_lot_in_ended_auction",
+    ).exists()
+
+
 def test_staging_repair_lifecycle_issues_is_idempotent(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "staging")
     seller = create_user("idempotent_seller", role=UserRole.SELLER)
     bidder = create_user("idempotent_bidder")
     auction = create_effectively_ended_live_auction(seller=seller)
     lot = create_sold_lot_missing_winner(auction=auction)
+    open_lot = create_open_lot_in_ended_auction(auction=auction)
     Bid.objects.create(lot=lot, bidder=bidder, amount=Decimal("125.00"), status=BidStatus.ACCEPTED)
+    Bid.objects.create(lot=open_lot, bidder=bidder, amount=Decimal("90.00"), status=BidStatus.REJECTED)
     first_output = StringIO()
     second_output = StringIO()
 
@@ -186,13 +266,13 @@ def test_staging_repair_lifecycle_issues_is_idempotent(monkeypatch):
     audit_count_after_first = AuditLog.objects.filter(metadata__source="staging_repair_lifecycle_issues").count()
     call_command("staging_repair_lifecycle_issues", apply=True, stdout=second_output)
 
-    assert "applied=2" in first_output.getvalue()
+    assert "applied=3" in first_output.getvalue()
     assert "applied=0" in second_output.getvalue()
     assert repair_snapshot() == after_first
     assert AuditLog.objects.filter(metadata__source="staging_repair_lifecycle_issues").count() == audit_count_after_first
 
 
-def test_staging_repair_lifecycle_issues_does_not_create_winner_without_valid_bid(monkeypatch):
+def test_staging_repair_lifecycle_issues_closes_sold_lot_without_valid_bid(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "staging")
     seller = create_user("no_bid_seller", role=UserRole.SELLER)
     rejected_bidder = create_user("rejected_bidder")
@@ -209,14 +289,18 @@ def test_staging_repair_lifecycle_issues_does_not_create_winner_without_valid_bi
     call_command("staging_repair_lifecycle_issues", apply=True, stdout=output)
 
     lot.refresh_from_db()
+    assert lot.status == LotStatus.CLOSED
     assert lot.winner_id is None
     assert lot.winning_bid_id is None
-    assert lot.winner_status == LotWinnerStatus.PENDING
+    assert lot.winner_status == LotWinnerStatus.NO_BIDS
+    assert lot.winner_calculated_at is not None
     assert "reason=no_valid_accepted_bid" in output.getvalue()
-    assert not AuditLog.objects.filter(
+    assert AuditLog.objects.filter(
+        action=AuditAction.ADMIN_ACTION,
         entity_type="lot",
         entity_id=str(lot.id),
         metadata__source="staging_repair_lifecycle_issues",
+        metadata__repair_action="close_sold_lot_without_valid_accepted_bid",
     ).exists()
 
 
