@@ -3,9 +3,12 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.core.management import get_commands
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import F, Q
@@ -22,6 +25,7 @@ NOT_CONFIGURED = "not configured"
 NOT_AVAILABLE = "not available"
 TARGET_AUCTIONS_MIGRATION = "0009_alter_bid_rejection_reason"
 TARGET_AUDIT_MIGRATION = "0011_alter_auditlog_action"
+COMMAND_FILTER_TERMS = ("staging", "diagnostics", "lifecycle", "fingerprint")
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,28 @@ def collect_staging_env_diagnostics() -> list[DiagnosticLine]:
         DiagnosticLine("service_name", first_safe_env_value(("BIDALS_SERVICE_NAME", "SERVICE_NAME", "RENDER_SERVICE_NAME"))),
         DiagnosticLine("render_service_id", first_safe_env_value(("RENDER_SERVICE_ID",))),
         DiagnosticLine("render_service_name", first_safe_env_value(("RENDER_SERVICE_NAME", "RENDER_SERVICE_SLUG"))),
+    ]
+
+
+def collect_deployment_fingerprint() -> list[DiagnosticLine]:
+    commands = matching_management_commands()
+    return [
+        DiagnosticLine("git_commit_sha", git_commit_sha()),
+        DiagnosticLine("git_branch", git_branch()),
+        DiagnosticLine("render_service_id", first_safe_env_value(("RENDER_SERVICE_ID",))),
+        DiagnosticLine("render_service_name", first_safe_env_value(("RENDER_SERVICE_NAME", "RENDER_SERVICE_SLUG"))),
+        DiagnosticLine("render_service_type", first_safe_env_value(("RENDER_SERVICE_TYPE",))),
+        DiagnosticLine("render_external_hostname", first_safe_env_value(("RENDER_EXTERNAL_HOSTNAME",))),
+        DiagnosticLine("service_name", first_safe_env_value(("BIDALS_SERVICE_NAME", "SERVICE_NAME", "RENDER_SERVICE_NAME"))),
+        DiagnosticLine("environment", first_safe_env_value(("BIDALS_ENV", "ENV", "SENTRY_ENVIRONMENT"))),
+        DiagnosticLine("app_root_path", str(settings.BASE_DIR)),
+        DiagnosticLine("python_executable", sys.executable),
+        DiagnosticLine("python_path", safe_python_path()),
+        DiagnosticLine("DJANGO_SETTINGS_MODULE", os.environ.get("DJANGO_SETTINGS_MODULE", NOT_CONFIGURED)),
+        DiagnosticLine("installed_apps_audit_auctions", installed_apps_containing(("auctions", "audit"))),
+        DiagnosticLine("file_staging_env_diagnostics.py", file_exists_label("staging_env_diagnostics.py")),
+        DiagnosticLine("file_staging_lifecycle_readiness.py", file_exists_label("staging_lifecycle_readiness.py")),
+        DiagnosticLine("matching_management_commands", ", ".join(commands) if commands else "none"),
     ]
 
 
@@ -331,6 +357,45 @@ def git_commit_sha_from_environment() -> str:
     return NOT_CONFIGURED
 
 
+def git_commit_sha() -> str:
+    from_env = git_commit_sha_from_environment()
+    if from_env != NOT_CONFIGURED:
+        return from_env
+    return git_metadata("rev-parse", "--verify", "HEAD", validator=r"[0-9a-fA-F]{40}")
+
+
+def git_branch() -> str:
+    for name in ("RENDER_GIT_BRANCH", "GIT_BRANCH", "BRANCH", "SOURCE_BRANCH"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return safe_env_value(value)
+    return git_metadata("branch", "--show-current")
+
+
+def git_metadata(*args: str, validator: str | None = None) -> str:
+    candidate_roots = (getattr(settings, "ROOT_DIR", settings.BASE_DIR), settings.BASE_DIR)
+    for root in candidate_roots:
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                cwd=root,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=2,
+            )
+        except Exception:
+            continue
+
+        value = result.stdout.strip()
+        if result.returncode != 0 or not value:
+            continue
+        if validator and not re.fullmatch(validator, value):
+            continue
+        return safe_env_value(value)
+    return NOT_CONFIGURED
+
+
 def first_safe_env_value(names: tuple[str, ...]) -> str:
     for name in names:
         value = os.environ.get(name, "").strip()
@@ -344,6 +409,46 @@ def safe_env_value(value: str) -> str:
         return "configured, but value is too long to print safely"
     if not re.fullmatch(r"[A-Za-z0-9_.:/@ -]+", value):
         return "configured, but value contains characters not printed safely"
+    return value
+
+
+def command_file_path(filename: str) -> Path:
+    return settings.BASE_DIR / "apps" / "audit" / "management" / "commands" / filename
+
+
+def file_exists_label(filename: str) -> str:
+    path = command_file_path(filename)
+    return f"{path.exists()} ({path})"
+
+
+def matching_management_commands() -> list[str]:
+    command_names = sorted(get_commands())
+    return [
+        name
+        for name in command_names
+        if any(term in name.lower() for term in COMMAND_FILTER_TERMS)
+    ]
+
+
+def installed_apps_containing(terms: tuple[str, ...]) -> str:
+    matches = [
+        app
+        for app in settings.INSTALLED_APPS
+        if any(term in app.lower() for term in terms)
+    ]
+    return ", ".join(matches) if matches else "none"
+
+
+def safe_python_path() -> str:
+    paths = [safe_path_value(path) for path in sys.path if path]
+    return os.pathsep.join(paths) if paths else NOT_CONFIGURED
+
+
+def safe_path_value(value: str) -> str:
+    if len(value) > 240:
+        return "<path too long>"
+    if not re.fullmatch(r"[A-Za-z0-9_./:\\ -]+", value):
+        return "<path contains unsafe characters>"
     return value
 
 
