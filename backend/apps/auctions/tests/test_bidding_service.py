@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal
 import threading
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -20,6 +21,7 @@ from apps.auctions.models import (
     Lot,
     LotStatus,
 )
+from apps.auctions.services.closing import close_expired_auctions
 from apps.auctions.services.bidding import place_bid
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -127,7 +129,74 @@ def test_rejects_bid_before_auction_start():
     result = place_bid(bidder, lot.id, Decimal("100.00"))
 
     assert result.status == BidStatus.REJECTED
-    assert result.reason == BidRejectionReason.AUCTION_NOT_LIVE
+    assert result.reason == BidRejectionReason.AUCTION_NOT_STARTED
+
+
+def test_scheduled_auction_before_start_rejects_bid_and_stays_scheduled():
+    seller = create_user("seller", role=UserRole.SELLER)
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        status=AuctionStatus.SCHEDULED,
+        starts_at=now + timedelta(minutes=10),
+        ends_at=now + timedelta(minutes=20),
+    )
+    lot = create_lot(auction=auction)
+    bidder = create_user("bidder")
+
+    result = place_bid(bidder, lot.id, Decimal("100.00"))
+
+    auction.refresh_from_db()
+    assert result.status == BidStatus.REJECTED
+    assert result.reason == BidRejectionReason.AUCTION_NOT_STARTED
+    assert auction.status == AuctionStatus.SCHEDULED
+
+
+def test_scheduled_auction_after_start_is_activated_and_accepts_valid_bid():
+    seller = create_user("seller", role=UserRole.SELLER)
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        status=AuctionStatus.SCHEDULED,
+        starts_at=now - timedelta(minutes=1),
+        ends_at=now + timedelta(minutes=20),
+    )
+    lot = create_lot(auction=auction)
+    bidder = create_user("bidder")
+
+    result = place_bid(bidder, lot.id, Decimal("100.00"))
+
+    auction.refresh_from_db()
+    lot.refresh_from_db()
+    assert result.accepted is True
+    assert auction.status == AuctionStatus.LIVE
+    assert lot.current_price == Decimal("100.00")
+    assert AuditLog.objects.filter(
+        action=AuditAction.AUCTION_UPDATED,
+        metadata__auction_id=auction.id,
+        metadata__lifecycle_event="auction_activated",
+    ).count() == 1
+
+
+def test_display_cased_scheduled_auction_after_start_accepts_valid_bid():
+    seller = create_user("seller_display_scheduled", role=UserRole.SELLER)
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        status="Scheduled",
+        starts_at=now - timedelta(minutes=1),
+        ends_at=now + timedelta(minutes=20),
+    )
+    lot = create_lot(auction=auction)
+    bidder = create_user("bidder_display_scheduled")
+
+    result = place_bid(bidder, lot.id, Decimal("100.00"))
+
+    auction.refresh_from_db()
+    lot.refresh_from_db()
+    assert result.accepted is True
+    assert auction.status == AuctionStatus.LIVE
+    assert lot.current_price == Decimal("100.00")
 
 
 def test_rejects_bid_after_auction_end():
@@ -143,8 +212,47 @@ def test_rejects_bid_after_auction_end():
 
     result = place_bid(bidder, lot.id, Decimal("100.00"))
 
+    auction.refresh_from_db()
     assert result.status == BidStatus.REJECTED
-    assert result.reason == BidRejectionReason.AUCTION_NOT_LIVE
+    assert result.reason == BidRejectionReason.AUCTION_ENDED
+    assert auction.status == AuctionStatus.ENDED
+
+
+def test_rejected_bid_after_end_does_not_block_safe_finalisation():
+    seller = create_user("seller", role=UserRole.SELLER)
+    bidder = create_user("bidder")
+    late_bidder = create_user("late_bidder")
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        starts_at=now - timedelta(minutes=20),
+        ends_at=now - timedelta(seconds=1),
+    )
+    lot = create_lot(auction=auction)
+    accepted_bid = Bid.objects.create(
+        lot=lot,
+        bidder=bidder,
+        amount=Decimal("120.00"),
+        status=BidStatus.ACCEPTED,
+        server_timestamp=now - timedelta(minutes=2),
+    )
+
+    result = place_bid(late_bidder, lot.id, Decimal("130.00"))
+    close_expired_auctions(now=timezone.now())
+
+    lot.refresh_from_db()
+    rejected_bid = Bid.objects.get(lot=lot, bidder=late_bidder)
+    assert result.status == BidStatus.REJECTED
+    assert result.reason == BidRejectionReason.AUCTION_ENDED
+    assert rejected_bid.status == BidStatus.REJECTED
+    assert rejected_bid.rejection_reason == BidRejectionReason.AUCTION_ENDED
+    assert lot.winning_bid == accepted_bid
+    assert lot.winner == bidder
+    assert AuditLog.objects.filter(
+        action=AuditAction.BID_REJECTED,
+        entity_id=str(rejected_bid.id),
+        metadata__reason=BidRejectionReason.AUCTION_ENDED,
+    ).exists()
 
 
 def test_rejects_bid_on_closed_lot():
@@ -256,3 +364,16 @@ def test_concurrent_bidding_uses_locked_current_price_and_prevents_lower_overwri
     assert lot.current_price == Decimal("110.00")
     assert higher_bid.bidder == higher_bidder
     assert lower_accepted_after_higher is False
+
+
+def test_bid_transaction_rolls_back_without_partial_bid_or_price_update():
+    _, _, lot = live_lot()
+    bidder = create_user("bidder")
+
+    with patch("apps.auctions.services.bidding.AuditLog.objects.create", side_effect=RuntimeError("network down")):
+        with pytest.raises(RuntimeError):
+            place_bid(bidder, lot.id, Decimal("100.00"))
+
+    lot.refresh_from_db()
+    assert lot.current_price == Decimal("90.00")
+    assert not Bid.objects.filter(lot=lot, bidder=bidder).exists()

@@ -8,11 +8,19 @@ from django.utils import timezone
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
 from apps.auctions.models import (
+    Auction,
+    AuctionStatus,
     Bid,
     BidRejectionReason,
     BidStatus,
     Lot,
     LotStatus,
+)
+from apps.auctions.services.lifecycle import (
+    get_effective_auction_status,
+    get_effective_lot_status,
+    is_lot_biddable,
+    sync_locked_auction_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,17 +56,27 @@ class BidResult:
 def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None = None) -> BidResult:
     amount = Decimal(amount)
     request_context = request_context or {}
+    lot_snapshot = Lot.objects.only("id", "auction_id").get(pk=lot_id)
 
     with transaction.atomic():
-        # The lot row is the bid-critical state. Lock it before reading price/status
-        # so concurrent bids validate against the latest committed server state.
+        # Lock auction before lot so bid submission and lifecycle jobs take rows in
+        # the same order. The eligibility checks below use this locked state.
+        auction = Auction.objects.select_for_update().select_related("created_by").get(pk=lot_snapshot.auction_id)
         lot = (
             Lot.objects.select_for_update()
             .select_related("auction", "auction__created_by")
             .get(pk=lot_id)
         )
-        auction = lot.auction
+        if lot.auction_id != auction.id:
+            auction = Auction.objects.select_for_update().select_related("created_by").get(pk=lot.auction_id)
+        lot.auction = auction
         server_timestamp = timezone.now()
+        effective_auction_status, _ = sync_locked_auction_status(
+            auction,
+            now=server_timestamp,
+            source="bid_submission",
+        )
+        effective_lot_status = get_effective_lot_status(lot, now=server_timestamp)
 
         if not user or not user.is_authenticated:
             return _reject_bid(
@@ -68,6 +86,8 @@ def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None =
                 reason=BidRejectionReason.UNAUTHENTICATED,
                 server_timestamp=server_timestamp,
                 create_bid_record=False,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
@@ -78,26 +98,37 @@ def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None =
                 amount=amount,
                 reason=BidRejectionReason.USER_NOT_ALLOWED,
                 server_timestamp=server_timestamp,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
-        if not auction.is_live_at(server_timestamp):
+        if effective_auction_status != AuctionStatus.LIVE:
+            reason = (
+                BidRejectionReason.AUCTION_ENDED
+                if effective_auction_status == AuctionStatus.ENDED
+                else BidRejectionReason.AUCTION_NOT_STARTED
+            )
             return _reject_bid(
                 actor=user,
                 lot=lot,
                 amount=amount,
-                reason=BidRejectionReason.AUCTION_NOT_LIVE,
+                reason=reason,
                 server_timestamp=server_timestamp,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
-        if lot.status != LotStatus.OPEN:
+        if effective_lot_status != LotStatus.OPEN or not is_lot_biddable(lot, now=server_timestamp):
             return _reject_bid(
                 actor=user,
                 lot=lot,
                 amount=amount,
                 reason=BidRejectionReason.LOT_CLOSED,
                 server_timestamp=server_timestamp,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
@@ -109,6 +140,8 @@ def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None =
                 amount=amount,
                 reason=BidRejectionReason.BID_TOO_LOW,
                 server_timestamp=server_timestamp,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
@@ -119,6 +152,8 @@ def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None =
                 amount=amount,
                 reason=BidRejectionReason.INVALID_INCREMENT,
                 server_timestamp=server_timestamp,
+                effective_auction_status=effective_auction_status,
+                effective_lot_status=effective_lot_status,
                 request_context=request_context,
             )
 
@@ -145,6 +180,19 @@ def place_bid(user, lot_id: int, amount: Decimal, request_context: dict | None =
                 "amount": str(amount),
                 "previous_price": str(previous_price),
                 "new_price": str(lot.current_price),
+                "actor": "user",
+                "previous_state": {
+                    "auction_status": auction.status,
+                    "lot_status": lot.status,
+                    "current_price": str(previous_price),
+                },
+                "new_state": {
+                    "auction_status": get_effective_auction_status(auction, now=server_timestamp),
+                    "lot_status": get_effective_lot_status(lot, now=server_timestamp),
+                    "current_price": str(lot.current_price),
+                },
+                "effective_auction_status": effective_auction_status,
+                "effective_lot_status": effective_lot_status,
                 **request_context,
             },
         )
@@ -179,6 +227,8 @@ def _reject_bid(
     reason: str,
     server_timestamp,
     create_bid_record: bool = True,
+    effective_auction_status: str | None = None,
+    effective_lot_status: str | None = None,
     request_context: dict | None = None,
 ) -> BidResult:
     request_context = request_context or {}
@@ -206,6 +256,19 @@ def _reject_bid(
             "attempted_amount": str(amount),
             "current_price": str(lot.current_price),
             "reason": reason,
+            "actor": "user" if actor else "anonymous",
+            "previous_state": {
+                "auction_status": lot.auction.status,
+                "lot_status": lot.status,
+                "current_price": str(lot.current_price),
+            },
+            "new_state": {
+                "auction_status": effective_auction_status or lot.auction.status,
+                "lot_status": effective_lot_status or lot.status,
+                "current_price": str(lot.current_price),
+            },
+            "effective_auction_status": effective_auction_status,
+            "effective_lot_status": effective_lot_status,
             **request_context,
         },
     )
@@ -222,6 +285,19 @@ def _reject_bid(
             "attempted_amount": str(amount),
             "current_price": str(lot.current_price),
             "reason": reason,
+            "actor": "user" if actor else "anonymous",
+            "previous_state": {
+                "auction_status": lot.auction.status,
+                "lot_status": lot.status,
+                "current_price": str(lot.current_price),
+            },
+            "new_state": {
+                "auction_status": effective_auction_status or lot.auction.status,
+                "lot_status": effective_lot_status or lot.status,
+                "current_price": str(lot.current_price),
+            },
+            "effective_auction_status": effective_auction_status,
+            "effective_lot_status": effective_lot_status,
             **request_context,
         },
     )

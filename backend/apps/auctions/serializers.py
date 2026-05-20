@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.auctions.models import (
@@ -16,6 +17,21 @@ from apps.auctions.models import (
     OutcomeRepairRequest,
 )
 from apps.auctions.services.fulfillment import get_allowed_fulfillment_transitions
+from apps.auctions.services.lifecycle import (
+    get_auction_closure_reason,
+    get_effective_auction_status,
+    get_effective_lot_status,
+    get_lot_closure_reason,
+    is_lot_biddable,
+)
+
+
+def _serializer_server_now(serializer) -> object:
+    server_now = serializer.context.get("server_now")
+    if server_now is None:
+        server_now = timezone.now()
+        serializer.context["server_now"] = server_now
+    return server_now
 
 
 class LotImageSerializer(serializers.ModelSerializer):
@@ -75,6 +91,12 @@ class LotImageReorderSerializer(serializers.Serializer):
 
 class AuctionSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+    effective_status = serializers.SerializerMethodField()
+    server_now = serializers.SerializerMethodField()
+    bidding_opens_at = serializers.DateTimeField(source="start_time", read_only=True)
+    bidding_closes_at = serializers.DateTimeField(source="end_time", read_only=True)
+    can_bid = serializers.SerializerMethodField()
+    closure_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = Auction
@@ -85,6 +107,12 @@ class AuctionSerializer(serializers.ModelSerializer):
             "start_time",
             "end_time",
             "status",
+            "effective_status",
+            "server_now",
+            "bidding_opens_at",
+            "bidding_closes_at",
+            "can_bid",
+            "closure_reason",
             "created_by",
             "created_by_username",
             "created_at",
@@ -95,16 +123,65 @@ class AuctionSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
         end_time = attrs.get("end_time", getattr(self.instance, "end_time", None))
+        status = attrs.get("status", getattr(self.instance, "status", AuctionStatus.DRAFT))
 
         if start_time and end_time and end_time <= start_time:
             raise serializers.ValidationError({"end_time": "Auction end time must be after start time."})
 
+        now = timezone.now()
+        if status in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE} and end_time and end_time <= now:
+            raise serializers.ValidationError({"end_time": "Auction end time must stay in the future."})
+
+        if status == AuctionStatus.LIVE and start_time and end_time and not (start_time <= now < end_time):
+            raise serializers.ValidationError({"status": "Live auctions must be within their backend bidding window."})
+
+        if self.instance:
+            effective_status = get_effective_auction_status(self.instance, now=now)
+            timing_updates = {"start_time", "end_time"}.intersection(attrs)
+            if effective_status == AuctionStatus.LIVE and timing_updates:
+                if "start_time" in attrs and attrs["start_time"] != self.instance.start_time:
+                    raise serializers.ValidationError(
+                        {"start_time": "Live auction start time cannot be changed."}
+                    )
+                if "end_time" in attrs:
+                    new_end_time = attrs["end_time"]
+                    if new_end_time <= now:
+                        raise serializers.ValidationError(
+                            {"end_time": "Live auction end time cannot be moved into the past."}
+                        )
+                    if new_end_time < self.instance.end_time:
+                        raise serializers.ValidationError(
+                            {"end_time": "Live auction end time can only be extended."}
+                        )
+
+            if effective_status == AuctionStatus.LIVE and "status" in attrs and attrs["status"] != self.instance.status:
+                raise serializers.ValidationError({"status": "Live auction status is controlled by backend lifecycle jobs."})
+
         return attrs
+
+    def get_effective_status(self, obj):
+        return get_effective_auction_status(obj, now=_serializer_server_now(self))
+
+    def get_server_now(self, obj):
+        return _serializer_server_now(self)
+
+    def get_can_bid(self, obj):
+        return get_effective_auction_status(obj, now=_serializer_server_now(self)) == AuctionStatus.LIVE
+
+    def get_closure_reason(self, obj):
+        return get_auction_closure_reason(obj, now=_serializer_server_now(self))
 
 
 class LotSerializer(serializers.ModelSerializer):
     auction_title = serializers.CharField(source="auction.title", read_only=True)
     auction_status = serializers.CharField(source="auction.status", read_only=True)
+    auction_effective_status = serializers.SerializerMethodField()
+    effective_status = serializers.SerializerMethodField()
+    server_now = serializers.SerializerMethodField()
+    bidding_opens_at = serializers.DateTimeField(source="auction.start_time", read_only=True)
+    bidding_closes_at = serializers.DateTimeField(source="auction.end_time", read_only=True)
+    can_bid = serializers.SerializerMethodField()
+    closure_reason = serializers.SerializerMethodField()
     uploaded_images = LotImageSerializer(many=True, read_only=True)
     winner_username = serializers.CharField(source="winner.username", read_only=True)
 
@@ -115,6 +192,7 @@ class LotSerializer(serializers.ModelSerializer):
             "auction",
             "auction_title",
             "auction_status",
+            "auction_effective_status",
             "title",
             "description",
             "images",
@@ -129,6 +207,12 @@ class LotSerializer(serializers.ModelSerializer):
             "winning_bid",
             "winner_status",
             "winner_calculated_at",
+            "effective_status",
+            "server_now",
+            "bidding_opens_at",
+            "bidding_closes_at",
+            "can_bid",
+            "closure_reason",
             "created_at",
             "updated_at",
         )
@@ -136,6 +220,7 @@ class LotSerializer(serializers.ModelSerializer):
             "id",
             "auction_title",
             "auction_status",
+            "auction_effective_status",
             "uploaded_images",
             "current_price",
             "winner",
@@ -143,6 +228,12 @@ class LotSerializer(serializers.ModelSerializer):
             "winning_bid",
             "winner_status",
             "winner_calculated_at",
+            "effective_status",
+            "server_now",
+            "bidding_opens_at",
+            "bidding_closes_at",
+            "can_bid",
+            "closure_reason",
             "created_at",
             "updated_at",
         )
@@ -182,6 +273,21 @@ class LotSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+
+    def get_auction_effective_status(self, obj):
+        return get_effective_auction_status(obj.auction, now=_serializer_server_now(self))
+
+    def get_effective_status(self, obj):
+        return get_effective_lot_status(obj, now=_serializer_server_now(self))
+
+    def get_server_now(self, obj):
+        return _serializer_server_now(self)
+
+    def get_can_bid(self, obj):
+        return is_lot_biddable(obj, now=_serializer_server_now(self))
+
+    def get_closure_reason(self, obj):
+        return get_lot_closure_reason(obj, now=_serializer_server_now(self))
 
 
 class BidSerializer(serializers.ModelSerializer):

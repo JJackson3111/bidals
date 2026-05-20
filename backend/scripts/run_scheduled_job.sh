@@ -24,11 +24,11 @@ JOB_NAME="$1"
 shift
 
 case "$JOB_NAME" in
-  close_expired_auctions|monitor_bid_anomalies|deliver_notifications)
+  open_scheduled_auctions|close_expired_auctions|monitor_bid_anomalies|deliver_notifications)
     ;;
   *)
     echo "ERROR: unsupported scheduled job '$JOB_NAME'." >&2
-    echo "Allowed jobs: close_expired_auctions, monitor_bid_anomalies, deliver_notifications." >&2
+    echo "Allowed jobs: open_scheduled_auctions, close_expired_auctions, monitor_bid_anomalies, deliver_notifications." >&2
     exit 64
     ;;
 esac

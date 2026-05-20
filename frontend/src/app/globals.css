@@ -1758,6 +1758,7 @@ p {
   display: inline-flex;
   font-size: 0.75rem;
   font-weight: 800;
+  justify-content: center;
   padding: 4px 8px;
   text-transform: uppercase;
 }
@@ -1795,7 +1796,35 @@ p {
   align-items: center;
   display: inline-flex;
   gap: 5px;
+  justify-content: flex-end;
+  min-width: 136px;
+  transition: color 160ms ease;
   white-space: nowrap;
+}
+
+.auction-card .status-pill {
+  min-width: 68px;
+  text-transform: none;
+}
+
+.countdown.is-urgent {
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.countdown-value {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  min-width: 5.4ch;
+  text-align: left;
+}
+
+.auction-card-cta {
+  transition: color 160ms ease;
+}
+
+.auction-card-cta.is-preview {
+  color: var(--muted);
 }
 
 .mini-meta {
@@ -2485,7 +2514,9 @@ p {
   .cue-primary,
   .cue-secondary,
   .landing-step-line::after,
-  .live-dot {
+  .live-dot,
+  .countdown,
+  .auction-card-cta {
     animation: none;
     transition: none;
   }

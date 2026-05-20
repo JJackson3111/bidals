@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AuctionCard } from "@/components/AuctionCard";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
@@ -14,6 +14,12 @@ export default function AuctionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lotPreviewError, setLotPreviewError] = useState<string | null>(null);
+  const auctionRefreshInFlight = useRef(false);
+
+  const refreshAuctions = useCallback(async () => {
+    const auctionData = await api.getAuctions();
+    setAuctions(auctionData);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -21,8 +27,7 @@ export default function AuctionsPage() {
       setError(null);
       setLotPreviewError(null);
       try {
-        const auctionData = await api.getAuctions();
-        setAuctions(auctionData);
+        await refreshAuctions();
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Unable to load auctions.");
         setIsLoading(false);
@@ -41,7 +46,18 @@ export default function AuctionsPage() {
     }
 
     load();
-  }, []);
+  }, [refreshAuctions]);
+
+  const handleAuctionLifecycleBoundary = useCallback(() => {
+    if (auctionRefreshInFlight.current) return;
+
+    auctionRefreshInFlight.current = true;
+    refreshAuctions()
+      .catch(() => undefined)
+      .finally(() => {
+        auctionRefreshInFlight.current = false;
+      });
+  }, [refreshAuctions]);
 
   const featuredLots = useMemo(() => lots.slice(0, 8), [lots]);
 
@@ -60,7 +76,11 @@ export default function AuctionsPage() {
         ) : (
           <div className="feed-grid">
             {auctions.map((auction) => (
-              <AuctionCard key={auction.id} auction={auction} />
+              <AuctionCard
+                key={auction.id}
+                auction={auction}
+                onLifecycleBoundary={handleAuctionLifecycleBoundary}
+              />
             ))}
           </div>
         )}

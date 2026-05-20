@@ -25,7 +25,18 @@ def test_scheduled_job_runner_validates_prod_settings_and_database_env():
     assert "email_env=pass" in script
     assert "dirname" not in script
     assert "${0%/*}" in script
-    assert "close_expired_auctions|monitor_bid_anomalies|deliver_notifications" in script
+    assert "open_scheduled_auctions|close_expired_auctions|monitor_bid_anomalies|deliver_notifications" in script
+
+
+def test_scheduled_job_runner_rejects_unsupported_jobs_before_env_validation():
+    script = Path(__file__).resolve().parents[3] / "scripts" / "run_scheduled_job.sh"
+
+    result = subprocess.run(["sh", str(script), "definitely_not_allowed"], capture_output=True, text=True)
+
+    assert result.returncode == 64
+    assert "ERROR: unsupported scheduled job 'definitely_not_allowed'." in result.stderr
+    assert "open_scheduled_auctions" in result.stderr
+    assert "scheduled job is missing required production env vars" not in result.stderr
 
 
 def test_production_dockerfile_exposes_scheduled_job_runner():

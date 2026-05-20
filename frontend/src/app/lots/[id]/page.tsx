@@ -1,13 +1,20 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BidPanel } from "@/components/BidPanel";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
 import { StatusPill } from "@/components/StatusPill";
 import { api, ApiError } from "@/lib/api";
+import {
+  canBidOnLot,
+  getAuctionDisplayState,
+  getDisplayLotStatus,
+  phaseFromAuctionStatus,
+  type AuctionPhase,
+} from "@/lib/auctionLifecycle";
 import { formatDateTime, formatMoney, getLotPrimaryImageUrl } from "@/lib/format";
 import type { Auction, Bid, BidResponse, Lot } from "@/lib/types";
 
@@ -18,6 +25,10 @@ export default function LotDetailPage() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  const refreshInFlight = useRef(false);
+  const lastObservedPhase = useRef<AuctionPhase | null>(null);
+  const lastNotifiedKey = useRef<string | null>(null);
 
   const loadLot = useCallback(async () => {
     const lotData = await api.getLot(params.id);
@@ -56,6 +67,48 @@ export default function LotDetailPage() {
     return () => window.clearInterval(interval);
   }, [params.id, loadLot]);
 
+  useEffect(() => {
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const auctionDisplay = useMemo(
+    () => auction ? getAuctionDisplayState(auction, nowMs) : null,
+    [auction, nowMs],
+  );
+
+  const refreshLifecycleData = useCallback(() => {
+    if (refreshInFlight.current) return;
+
+    refreshInFlight.current = true;
+    loadLot()
+      .catch(() => undefined)
+      .finally(() => {
+        refreshInFlight.current = false;
+      });
+  }, [loadLot]);
+
+  useEffect(() => {
+    if (!auction || !auctionDisplay || nowMs === null) return;
+
+    const previousPhase = lastObservedPhase.current;
+    lastObservedPhase.current = auctionDisplay.phase;
+
+    const statusPhase = phaseFromAuctionStatus(auction.status);
+    const crossedBoundary = previousPhase !== null && previousPhase !== auctionDisplay.phase;
+    const backendLooksStale = statusPhase !== null && statusPhase !== auctionDisplay.phase;
+    const notifyKey = `${auction.id}:${auction.status}:${auctionDisplay.phase}`;
+
+    if ((crossedBoundary || backendLooksStale) && lastNotifiedKey.current !== notifyKey) {
+      lastNotifiedKey.current = notifyKey;
+      refreshLifecycleData();
+    }
+  }, [auction, auctionDisplay, nowMs, refreshLifecycleData]);
+
   async function handleBidSettled(response: BidResponse) {
     setLot((current) => {
       if (!current) return current;
@@ -69,6 +122,13 @@ export default function LotDetailPage() {
   if (!lot) return <main className="page-shell"><EmptyState title="Lot not found" message="This lot is not available." /></main>;
 
   const primaryImageUrl = getLotPrimaryImageUrl(lot);
+  const display = auctionDisplay ?? (auction ? getAuctionDisplayState(auction, nowMs) : null);
+  const displayLotStatus = getDisplayLotStatus(lot, display?.phase ?? null);
+  const biddingEnabled = canBidOnLot(lot, auction, nowMs);
+  const bidDisabledReason = getBidDisabledReason({
+    auctionPhase: display?.phase ?? null,
+    lotStatus: lot.status,
+  });
 
   return (
     <main className="page-shell lot-detail-grid">
@@ -86,9 +146,16 @@ export default function LotDetailPage() {
           </div>
         )}
         <div className="detail-topline">
-          <StatusPill status={lot.status} />
-          {auction ? <StatusPill status={auction.status} /> : null}
-          {auction ? <CountdownTimer endTime={auction.end_time} /> : null}
+          <StatusPill status={displayLotStatus} />
+          {display ? <StatusPill label={display.badgeLabel} status={display.badgeStatus} /> : null}
+          {display?.targetTime && display.countdownLabel ? (
+            <CountdownTimer
+              label={display.countdownLabel}
+              nowMs={nowMs}
+              onElapsed={refreshLifecycleData}
+              targetTime={display.targetTime}
+            />
+          ) : null}
         </div>
         <div className="page-heading">
           <span className="eyebrow">{lot.auction_title}</span>
@@ -107,11 +174,11 @@ export default function LotDetailPage() {
             </div>
             <div>
               <dt>Auction status</dt>
-              <dd>{lot.auction_status}</dd>
+              <dd>{display?.badgeLabel ?? lot.auction_status}</dd>
             </div>
             <div>
               <dt>Lot status</dt>
-              <dd>{lot.status}</dd>
+              <dd>{displayLotStatus}</dd>
             </div>
             <div>
               <dt>Reserve</dt>
@@ -158,7 +225,27 @@ export default function LotDetailPage() {
         </section>
       </section>
 
-      <BidPanel lot={lot} onBidSettled={handleBidSettled} />
+      <BidPanel
+        disabledReason={bidDisabledReason}
+        isDisabled={!biddingEnabled}
+        lot={lot}
+        onBidSettled={handleBidSettled}
+      />
     </main>
   );
+}
+
+function getBidDisabledReason({
+  auctionPhase,
+  lotStatus,
+}: {
+  auctionPhase: AuctionPhase | null;
+  lotStatus: Lot["status"];
+}): string {
+  if (auctionPhase === "scheduled") return "Bidding opens when the auction starts.";
+  if (auctionPhase === "closed") return "This auction has closed.";
+  if (auctionPhase === "cancelled") return "This auction has been cancelled.";
+  if (lotStatus !== "open") return "This lot is not open for bidding.";
+  if (auctionPhase !== "live") return "Bidding is not available for this auction.";
+  return "Bidding is not available for this lot.";
 }

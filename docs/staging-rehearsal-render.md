@@ -160,7 +160,7 @@ Required env vars for every Render cron job:
 - `DJANGO_ALLOWED_HOSTS=<backend staging host>`
 - `DATABASE_URL=<Render PostgreSQL URL>` or `DJANGO_DATABASE_URL=<Render PostgreSQL URL>`
 
-These required vars apply to `close_expired_auctions`, `monitor_bid_anomalies`, and `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
+These required vars apply to `open_scheduled_auctions`, `close_expired_auctions`, `monitor_bid_anomalies`, and `deliver_notifications`. Email-specific vars are additional only when notification delivery is enabled.
 
 Copy these from the backend web service when enabled/configured:
 
@@ -174,13 +174,14 @@ The runner validates required vars before `django.setup()`. If several required 
 
 | Job | Command | Suggested frequency | Result |
 | --- | --- | --- | --- |
+| Auction scheduled-to-live activation | `sh /app/scripts/run_scheduled_job.sh open_scheduled_auctions` | Every 1 minute, or every 5 minutes only if that delay is acceptable | Configure alongside the closer so due scheduled auctions become backend-live without manual admin changes |
 | Auction closing and winner calculation | `sh /app/scripts/run_scheduled_job.sh close_expired_auctions` | Every 1 minute, or the shortest Render-supported interval | PASS - Render cron executes through the hardened runner with production settings and PostgreSQL |
 | Bid anomaly monitoring | `sh /app/scripts/run_scheduled_job.sh monitor_bid_anomalies --window-minutes 60` | Every 5 minutes | PASS - Render cron executes through the hardened runner with production settings and PostgreSQL |
 | Notification delivery | `sh /app/scripts/run_scheduled_job.sh deliver_notifications` | Every 5 minutes if email enabled | PASS - Render cron executes through the hardened runner; notification delivery run completed successfully |
 
 Evidence to capture:
 
-- Render scheduler name: configured in Render Cron Jobs for auction closing, anomaly monitoring, and notification delivery.
+- Render scheduler name: configured in Render Cron Jobs for auction opening, auction closing, anomaly monitoring, and notification delivery.
 - Last run timestamp: available in Render cron logs.
 - Log excerpt showing success: confirmed safe diagnostics include `settings_module=bidals.settings.prod`, `database_engine=django.db.backends.postgresql`, `required_env=pass`, `redis_env=pass`, and `s3_env=pass`.
 - Notification delivery evidence: delivery run completed successfully.

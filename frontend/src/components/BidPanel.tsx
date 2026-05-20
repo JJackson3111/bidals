@@ -8,9 +8,13 @@ import { formatMoney, humanBidReason } from "@/lib/format";
 import type { BidRejectedResponse, BidResponse, Lot } from "@/lib/types";
 
 export function BidPanel({
+  disabledReason,
+  isDisabled = false,
   lot,
   onBidSettled,
 }: {
+  disabledReason?: string;
+  isDisabled?: boolean;
   lot: Lot;
   onBidSettled: (response: BidResponse) => Promise<void> | void;
 }) {
@@ -21,6 +25,7 @@ export function BidPanel({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isDisabled) return;
     setError(null);
     setMessage(null);
     setIsSubmitting(true);
@@ -56,9 +61,12 @@ export function BidPanel({
       </div>
       <form onSubmit={handleSubmit} className="bid-form">
         <label htmlFor="bid-amount">Bid amount</label>
-        <span className="form-help">Increment: {formatMoney(lot.bid_increment)}</span>
+        <span className="form-help">
+          {isDisabled ? disabledReason || "Bidding is not available for this lot." : `Increment: ${formatMoney(lot.bid_increment)}`}
+        </span>
         <div className="bid-input-row">
           <input
+            disabled={isDisabled || isSubmitting}
             id="bid-amount"
             inputMode="decimal"
             min="0"
@@ -70,9 +78,9 @@ export function BidPanel({
             type="number"
             value={amount}
           />
-          <button className="primary-button" disabled={isSubmitting} type="submit">
+          <button className="primary-button" disabled={isDisabled || isSubmitting} type="submit">
             <CircleDollarSign size={18} aria-hidden="true" />
-            {isSubmitting ? "Sending" : "Place bid"}
+            {isDisabled ? "Bidding unavailable" : isSubmitting ? "Sending" : "Place bid"}
           </button>
         </div>
       </form>

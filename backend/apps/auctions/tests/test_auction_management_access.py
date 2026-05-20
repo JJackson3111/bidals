@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import UserRole
+from apps.audit.models import AuditAction, AuditLog
 from apps.auctions.models import Auction, AuctionStatus, Lot, LotStatus
 
 pytestmark = pytest.mark.django_db
@@ -60,6 +61,20 @@ def test_seller_can_access_their_own_auction_management_detail():
     assert response.data["created_by"] == seller.id
 
 
+def test_seller_can_access_their_own_ended_auction_management_detail():
+    seller = create_user("seller", role=UserRole.SELLER)
+    auction = create_auction(seller=seller, status=AuctionStatus.ENDED)
+    client = APIClient()
+    client.force_authenticate(user=seller)
+
+    response = client.get(f"/api/auctions/{auction.id}/manage/")
+
+    assert response.status_code == 200
+    assert response.data["id"] == auction.id
+    assert response.data["created_by"] == seller.id
+    assert response.data["status"] == AuctionStatus.ENDED
+
+
 def test_unrelated_seller_cannot_access_other_seller_auction_management_detail():
     owner = create_user("owner", role=UserRole.SELLER)
     other_seller = create_user("other_seller", role=UserRole.SELLER)
@@ -90,6 +105,67 @@ def test_unrelated_seller_cannot_update_other_seller_auction():
     assert auction.title == "Estate Sale"
 
 
+def test_seller_can_extend_live_auction_end_time_and_edit_is_audited():
+    seller = create_user("seller", role=UserRole.SELLER)
+    auction = create_auction(seller=seller)
+    new_end_time = auction.end_time + timedelta(minutes=30)
+    client = APIClient()
+    client.force_authenticate(user=seller)
+
+    response = client.patch(
+        f"/api/auctions/{auction.id}/",
+        {"end_time": new_end_time.isoformat()},
+        format="json",
+    )
+
+    auction.refresh_from_db()
+    assert response.status_code == 200
+    assert auction.end_time == new_end_time
+    assert AuditLog.objects.filter(
+        action=AuditAction.SELLER_LIVE_TIMING_UPDATED,
+        metadata__auction_id=auction.id,
+        metadata__reason="seller_live_timing_edit",
+    ).exists()
+
+
+def test_seller_cannot_shorten_live_auction_end_time():
+    seller = create_user("seller", role=UserRole.SELLER)
+    auction = create_auction(seller=seller)
+    shortened_end_time = auction.end_time - timedelta(minutes=30)
+    client = APIClient()
+    client.force_authenticate(user=seller)
+
+    response = client.patch(
+        f"/api/auctions/{auction.id}/",
+        {"end_time": shortened_end_time.isoformat()},
+        format="json",
+    )
+
+    auction.refresh_from_db()
+    assert response.status_code == 400
+    assert auction.end_time != shortened_end_time
+    assert "end time can only be extended" in str(response.data["end_time"][0])
+
+
+def test_seller_cannot_move_live_auction_end_time_into_past():
+    seller = create_user("seller", role=UserRole.SELLER)
+    auction = create_auction(seller=seller)
+    past_end_time = timezone.now() - timedelta(minutes=1)
+    client = APIClient()
+    client.force_authenticate(user=seller)
+
+    response = client.patch(
+        f"/api/auctions/{auction.id}/",
+        {"end_time": past_end_time.isoformat()},
+        format="json",
+    )
+
+    auction.refresh_from_db()
+    assert response.status_code == 400
+    assert auction.end_time != past_end_time
+    assert "end time must stay in the future" in str(response.data["end_time"][0])
+
+
 def test_admin_can_access_any_auction_management_detail():
     owner = create_user("owner", role=UserRole.SELLER)
     admin = create_user("admin", role=UserRole.ADMIN)
@@ -112,6 +188,11 @@ def test_public_auction_detail_remains_publicly_viewable():
 
     assert response.status_code == 200
     assert response.data["id"] == auction.id
+    assert response.data["effective_status"] == AuctionStatus.LIVE
+    assert response.data["server_now"] is not None
+    assert response.data["bidding_opens_at"] is not None
+    assert response.data["bidding_closes_at"] is not None
+    assert response.data["can_bid"] is True
 
 
 def test_seller_browse_lists_only_include_their_own_auctions_and_lots():
@@ -174,6 +255,9 @@ def test_public_and_bidder_browsing_still_see_public_auctions_and_lots():
     assert [auction["id"] for auction in bidder_auction_response.data["results"]] == [public_auction.id]
     assert bidder_lot_response.status_code == 200
     assert [lot["id"] for lot in bidder_lot_response.data["results"]] == [public_lot.id]
+    assert bidder_lot_response.data["results"][0]["effective_status"] == LotStatus.OPEN
+    assert bidder_lot_response.data["results"][0]["can_bid"] is True
+    assert bidder_lot_response.data["results"][0]["server_now"] is not None
     assert bidder_detail_response.status_code == 200
 
 

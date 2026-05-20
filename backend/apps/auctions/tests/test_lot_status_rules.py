@@ -24,13 +24,14 @@ def create_user(username, role=UserRole.BIDDER):
     )
 
 
-def create_auction(*, seller, status):
+def create_auction(*, seller, status, starts_at=None, ends_at=None):
     now = timezone.now()
+    start_time = starts_at or now - timedelta(minutes=5)
     return Auction.objects.create(
         title=f"{status} auction",
         description="Status rule test auction.",
-        start_time=now - timedelta(minutes=5),
-        end_time=now + timedelta(hours=1),
+        start_time=start_time,
+        end_time=ends_at or start_time + timedelta(hours=1),
         status=status,
         created_by=seller,
     )
@@ -66,7 +67,13 @@ def test_lot_cannot_be_created_open_for_non_bid_eligible_auction_statuses(auctio
 def test_scheduled_auction_can_prepare_open_lot_but_bidding_is_not_live():
     seller = create_user("seller", role=UserRole.SELLER)
     bidder = create_user("bidder", role=UserRole.BIDDER)
-    auction = create_auction(seller=seller, status=AuctionStatus.SCHEDULED)
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        status=AuctionStatus.SCHEDULED,
+        starts_at=now + timedelta(minutes=5),
+        ends_at=now + timedelta(hours=1),
+    )
     client = APIClient()
     client.force_authenticate(user=seller)
 
@@ -75,7 +82,7 @@ def test_scheduled_auction_can_prepare_open_lot_but_bidding_is_not_live():
     assert response.status_code == 201
     lot = Lot.objects.get(pk=response.data["id"])
     result = place_bid(bidder, lot.id, Decimal("15.00"))
-    assert result.reason == BidRejectionReason.AUCTION_NOT_LIVE
+    assert result.reason == BidRejectionReason.AUCTION_NOT_STARTED
     lot.refresh_from_db()
     assert lot.current_price == Decimal("10.00")
 
