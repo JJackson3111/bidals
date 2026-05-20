@@ -178,6 +178,27 @@ def test_scheduled_auction_after_start_is_activated_and_accepts_valid_bid():
     ).count() == 1
 
 
+def test_display_cased_scheduled_auction_after_start_accepts_valid_bid():
+    seller = create_user("seller_display_scheduled", role=UserRole.SELLER)
+    now = timezone.now()
+    auction = create_auction(
+        seller=seller,
+        status="Scheduled",
+        starts_at=now - timedelta(minutes=1),
+        ends_at=now + timedelta(minutes=20),
+    )
+    lot = create_lot(auction=auction)
+    bidder = create_user("bidder_display_scheduled")
+
+    result = place_bid(bidder, lot.id, Decimal("100.00"))
+
+    auction.refresh_from_db()
+    lot.refresh_from_db()
+    assert result.accepted is True
+    assert auction.status == AuctionStatus.LIVE
+    assert lot.current_price == Decimal("100.00")
+
+
 def test_rejects_bid_after_auction_end():
     seller = create_user("seller", role=UserRole.SELLER)
     now = timezone.now()

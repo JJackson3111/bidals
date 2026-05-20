@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -96,6 +96,53 @@ def test_open_scheduled_auctions_skips_not_yet_due_and_expired_scheduled_auction
     assert expired.status == AuctionStatus.SCHEDULED
 
 
+@pytest.mark.parametrize("stored_status", ["open", "Scheduled"])
+def test_open_scheduled_auctions_normalizes_staging_like_status_values(stored_status):
+    seller = create_user(f"seller_{stored_status.lower()}", role=UserRole.SELLER)
+    now = timezone.now()
+    auction = Auction.objects.create(
+        title=f"Staging status {stored_status}",
+        description="A due auction using a legacy or display-cased staging status value.",
+        start_time=now - timedelta(minutes=1),
+        end_time=now + timedelta(minutes=10),
+        status=stored_status,
+        created_by=seller,
+    )
+
+    results = open_scheduled_auctions(now=now)
+
+    auction.refresh_from_db()
+    assert [result.auction_id for result in results] == [auction.id]
+    assert results[0].transitioned is True
+    assert auction.status == AuctionStatus.LIVE
+    assert AuditLog.objects.filter(
+        action=AuditAction.AUCTION_OPENED_AUTOMATICALLY,
+        metadata__auction_id=auction.id,
+        metadata__previous_status=stored_status,
+        metadata__new_status=AuctionStatus.LIVE,
+    ).count() == 1
+
+
+def test_open_scheduled_auctions_handles_utc_aware_timestamps():
+    seller = create_user("seller_utc", role=UserRole.SELLER)
+    now = datetime(2026, 5, 20, 12, 0, tzinfo=UTC)
+    auction = Auction.objects.create(
+        title="UTC Scheduled Auction",
+        description="A due scheduled auction with explicit UTC timestamps.",
+        start_time=now - timedelta(seconds=1),
+        end_time=now + timedelta(minutes=10),
+        status=AuctionStatus.SCHEDULED,
+        created_by=seller,
+    )
+
+    results = open_scheduled_auctions(now=now)
+
+    auction.refresh_from_db()
+    assert timezone.is_aware(auction.start_time)
+    assert [result.auction_id for result in results] == [auction.id]
+    assert auction.status == AuctionStatus.LIVE
+
+
 def test_open_scheduled_auctions_command_is_idempotent(capsys):
     seller = create_user("seller", role=UserRole.SELLER)
     auction = create_scheduled_auction(
@@ -110,6 +157,8 @@ def test_open_scheduled_auctions_command_is_idempotent(capsys):
     auction.refresh_from_db()
     output = capsys.readouterr().out
     assert auction.status == AuctionStatus.LIVE
+    assert "Due auctions found: 1; opened 1; skipped 0." in output
+    assert "Due auctions found: 0; opened 0; skipped 0." in output
     assert "opened 1" in output
     assert "opened 0" in output
     assert AuditLog.objects.filter(

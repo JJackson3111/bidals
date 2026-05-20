@@ -22,14 +22,35 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_ACTOR = "system"
 LEGACY_OPEN_AUCTION_STATUS = "open"
-ACTIVE_AUCTION_STATUSES = (
+SCHEDULED_AUCTION_STATUSES = (
     AuctionStatus.SCHEDULED,
+    "Scheduled",
+    "SCHEDULED",
+)
+LIVE_AUCTION_STATUS_ALIASES = (
     AuctionStatus.LIVE,
     LEGACY_OPEN_AUCTION_STATUS,
+    "Live",
+    "LIVE",
+    "Open",
+    "OPEN",
+)
+ENDED_AUCTION_STATUS_ALIASES = (
+    AuctionStatus.ENDED,
+    "ended",
+    "Ended",
+    "ENDED",
+    "closed",
+    "Closed",
+    "CLOSED",
+)
+ACTIVE_AUCTION_STATUSES = (
+    *SCHEDULED_AUCTION_STATUSES,
+    *LIVE_AUCTION_STATUS_ALIASES,
 )
 FINALIZABLE_AUCTION_STATUSES = (
     *ACTIVE_AUCTION_STATUSES,
-    AuctionStatus.ENDED,
+    *ENDED_AUCTION_STATUS_ALIASES,
 )
 
 
@@ -68,12 +89,29 @@ def current_lifecycle_time(now=None):
     return now
 
 
+def normalise_auction_status(status: str) -> str:
+    if status in SCHEDULED_AUCTION_STATUSES:
+        return AuctionStatus.SCHEDULED
+    if status in LIVE_AUCTION_STATUS_ALIASES:
+        return AuctionStatus.LIVE
+    if status in ENDED_AUCTION_STATUS_ALIASES:
+        return AuctionStatus.ENDED
+    if status in {AuctionStatus.DRAFT, "Draft", "DRAFT"}:
+        return AuctionStatus.DRAFT
+    if status in {AuctionStatus.CANCELLED, "Cancelled", "CANCELLED"}:
+        return AuctionStatus.CANCELLED
+    return status
+
+
 def get_effective_auction_status(auction: Auction, now=None) -> str:
     now = current_lifecycle_time(now)
-    if auction.status in {AuctionStatus.CANCELLED, AuctionStatus.DRAFT}:
-        return auction.status
-    if auction.status == AuctionStatus.ENDED:
+    normalised_status = normalise_auction_status(auction.status)
+    if normalised_status in {AuctionStatus.CANCELLED, AuctionStatus.DRAFT}:
+        return normalised_status
+    if normalised_status == AuctionStatus.ENDED:
         return AuctionStatus.ENDED
+    if normalised_status not in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE}:
+        return auction.status
     if auction.end_time <= now:
         return AuctionStatus.ENDED
     if auction.start_time <= now < auction.end_time:
@@ -141,17 +179,18 @@ def sync_locked_auction_status(auction: Auction, *, now=None, source: str = "lif
     now = current_lifecycle_time(now)
     effective_status = get_effective_auction_status(auction, now=now)
     previous_status = auction.status
+    normalised_previous_status = normalise_auction_status(previous_status)
 
     if previous_status == effective_status:
         return effective_status, False
 
-    if previous_status in ACTIVE_AUCTION_STATUSES and effective_status == AuctionStatus.LIVE:
+    if normalised_previous_status in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE} and effective_status == AuctionStatus.LIVE:
         auction.status = AuctionStatus.LIVE
         auction.save(update_fields=("status", "updated_at"))
         _audit_auction_opened(auction=auction, previous_status=previous_status, now=now, source=source)
         return effective_status, True
 
-    if previous_status in ACTIVE_AUCTION_STATUSES and effective_status == AuctionStatus.ENDED:
+    if normalised_previous_status in {AuctionStatus.SCHEDULED, AuctionStatus.LIVE} and effective_status == AuctionStatus.ENDED:
         auction.status = AuctionStatus.ENDED
         auction.save(update_fields=("status", "updated_at"))
         _audit_auction_closed(auction=auction, previous_status=previous_status, now=now, source=source)
@@ -164,7 +203,14 @@ def open_due_auctions(*, now=None, limit: int | None = None) -> list[AuctionLife
     now = current_lifecycle_time(now)
     candidates = (
         Auction.objects.filter(
-            status=AuctionStatus.SCHEDULED,
+            status__in=(
+                *SCHEDULED_AUCTION_STATUSES,
+                LEGACY_OPEN_AUCTION_STATUS,
+                "Open",
+                "OPEN",
+                "Live",
+                "LIVE",
+            ),
             start_time__lte=now,
             end_time__gt=now,
         )
@@ -193,8 +239,11 @@ def open_due_auctions(*, now=None, limit: int | None = None) -> list[AuctionLife
         "Due auction opening run completed",
         extra={
             "event": "open_due_auctions_run",
+            "due_auctions_found": len(results) + errors,
             "auctions_seen": len(results),
+            "auctions_opened": sum(1 for result in results if result.transitioned),
             "auctions_transitioned": sum(1 for result in results if result.transitioned),
+            "auctions_skipped": sum(1 for result in results if not result.transitioned),
             "errors": errors,
             "server_timestamp": now.isoformat(),
         },
@@ -417,7 +466,7 @@ def activate_scheduled_auction_if_due(auction_id: int, *, now=None) -> AuctionLi
                 transitioned=False,
                 skipped_reason="already_live",
             )
-        if auction.status != AuctionStatus.SCHEDULED:
+        if normalise_auction_status(auction.status) != AuctionStatus.SCHEDULED:
             return AuctionLifecycleResult(
                 auction_id=auction.id,
                 title=auction.title,
