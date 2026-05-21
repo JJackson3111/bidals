@@ -3182,23 +3182,16 @@ p {
   border-radius: 12px;
   box-shadow: 0 14px 32px rgba(23, 33, 30, 0.055);
   display: grid;
-  gap: 16px;
-  max-width: 860px;
-  padding: 14px;
+  gap: 12px;
+  max-width: 720px;
+  padding: 12px;
 }
 
 .browse-event-summary-top {
-  align-items: start;
+  align-items: stretch;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(98px, 112px) minmax(0, 1fr);
-}
-
-.browse-event-summary-main {
-  align-content: start;
-  display: grid;
-  gap: 10px;
-  min-width: 0;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .browse-event-logo {
@@ -3216,12 +3209,15 @@ p {
   color: var(--ink);
   display: inline-flex;
   justify-content: center;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
 }
 
 .browse-event-logo > svg {
   color: rgba(72, 83, 78, 0.64);
+  height: 28px;
+  width: 28px;
 }
 
 .browse-event-logo span {
@@ -3296,13 +3292,7 @@ p {
   text-transform: uppercase;
 }
 
-.browse-bidder-stats {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.browse-bidder-stats div,
+.browse-stat-card,
 .browse-lot-detail {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(23, 33, 30, 0.08);
@@ -3310,17 +3300,18 @@ p {
   box-shadow: 0 14px 30px rgba(23, 33, 30, 0.06);
 }
 
-.browse-bidder-stats div {
+.browse-stat-card {
   align-content: end;
+  aspect-ratio: 1;
   display: grid;
   gap: 4px;
-  min-height: 76px;
+  min-height: 0;
   overflow: hidden;
-  padding: 10px;
+  padding: 9px;
   position: relative;
 }
 
-.browse-bidder-stats svg {
+.browse-stat-card svg {
   color: var(--ink);
   opacity: 0.24;
   position: absolute;
@@ -3328,7 +3319,7 @@ p {
   top: 8px;
 }
 
-.browse-bidder-stats span,
+.browse-stat-card span,
 .browse-progress-compact-header span,
 .browse-progress-compact-footer span,
 .browse-section-heading span,
@@ -3341,7 +3332,7 @@ p {
   text-transform: uppercase;
 }
 
-.browse-bidder-stats strong {
+.browse-stat-card strong {
   color: var(--ink);
   font-size: clamp(1.28rem, 4vw, 1.62rem);
   line-height: 1;
@@ -3349,13 +3340,13 @@ p {
 
 .browse-progress-compact {
   background:
-    linear-gradient(180deg, rgba(249, 251, 247, 0.96), rgba(255, 255, 255, 0.9)),
-    rgba(255, 255, 255, 0.86);
+    linear-gradient(180deg, rgba(249, 251, 247, 0.86), rgba(255, 255, 255, 0.72)),
+    rgba(247, 250, 246, 0.78);
   border: 1px solid rgba(23, 33, 30, 0.07);
   border-radius: 10px;
   display: grid;
-  gap: 9px;
-  padding: 11px;
+  gap: 8px;
+  padding: 10px;
 }
 
 .browse-progress-compact-header,
@@ -3380,11 +3371,14 @@ p {
 
 .browse-progress-compact-footer {
   color: #64716c;
+  display: grid;
   font-size: 0.72rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .browse-progress-compact-footer strong {
   font-size: 0.72rem;
+  text-align: right;
 }
 
 .browse-progress-compact-track {
@@ -3895,17 +3889,18 @@ p {
 
   .browse-event-summary {
     border-radius: 10px;
-    gap: 14px;
-    padding: 12px;
+    gap: 10px;
+    padding: 10px;
   }
 
   .browse-event-summary-top {
-    gap: 10px;
-    grid-template-columns: minmax(88px, 96px) minmax(0, 1fr);
+    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .browse-event-summary-main {
-    gap: 8px;
+  .browse-event-logo > svg {
+    height: 24px;
+    width: 24px;
   }
 
   .browse-event-copy h1 {
@@ -3919,28 +3914,23 @@ p {
     line-height: 1.54;
   }
 
-  .browse-bidder-stats {
-    gap: 5px;
+  .browse-stat-card {
+    padding: 7px 6px;
   }
 
-  .browse-bidder-stats div {
-    min-height: 64px;
-    padding: 8px 7px;
-  }
-
-  .browse-bidder-stats svg {
+  .browse-stat-card svg {
     height: 14px;
     right: 7px;
     top: 7px;
     width: 14px;
   }
 
-  .browse-bidder-stats span {
+  .browse-stat-card span {
     font-size: 0.61rem;
   }
 
-  .browse-bidder-stats strong {
-    font-size: 1.15rem;
+  .browse-stat-card strong {
+    font-size: 1.08rem;
   }
 
   .browse-progress-compact {
@@ -4016,14 +4006,14 @@ p {
   }
 
   .browse-event-summary {
-    gap: 18px;
-    max-width: 880px;
-    padding: 18px;
+    gap: 14px;
+    max-width: 720px;
+    padding: 14px;
   }
 
   .browse-event-summary-top {
-    gap: 18px;
-    grid-template-columns: 148px minmax(0, 1fr);
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .browse-event-copy h1 {
@@ -4032,12 +4022,7 @@ p {
     max-width: 20ch;
   }
 
-  .browse-bidder-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .browse-bidder-stats div {
-    min-height: 86px;
+  .browse-stat-card {
     padding: 12px;
   }
 
@@ -4064,7 +4049,7 @@ p {
   }
 
   .browse-event-summary {
-    max-width: 900px;
+    max-width: 720px;
   }
 
   .browse-lot-grid {

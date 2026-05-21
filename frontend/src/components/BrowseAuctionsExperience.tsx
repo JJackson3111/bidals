@@ -292,7 +292,7 @@ export function BrowseAuctionsExperience() {
       <section className="browse-event-hero">
         <div className="browse-container">
           <div className="browse-event-summary">
-            <div className="browse-event-summary-top">
+            <section className="browse-event-summary-top" aria-label="Your event stats">
               <div className="browse-event-logo" aria-label={`${eventHub.auction.title} logo`}>
                 {eventLogoUrl ? (
                   <span style={{ backgroundImage: `url("${eventLogoUrl}")` }} />
@@ -301,28 +301,24 @@ export function BrowseAuctionsExperience() {
                 )}
               </div>
 
-              <div className="browse-event-summary-main">
-                <section className="browse-bidder-stats browse-bidder-stats-compact" aria-label="Your event stats">
-                  <EventStat icon={Sparkles} label="Bids made" value={eventHub.bidsMade} />
-                  <EventStat icon={Ticket} label="Raffle tickets" value={eventHub.raffleTickets} />
-                  <EventStat icon={Trophy} label="Won lots" value={eventHub.wonLots} />
-                </section>
+              <EventStat icon={Sparkles} label="Bids made" value={eventHub.bidsMade} />
+              <EventStat icon={Ticket} label="Raffles" value={eventHub.raffleTickets} />
+              <EventStat icon={Trophy} label="Won lots" value={eventHub.wonLots} />
+            </section>
 
-                <section className="browse-progress-compact" aria-label="Fundraising progress">
-                  <div className="browse-progress-compact-header">
-                    <span>Donation target</span>
-                    <strong>{formatWholeMoney(eventHub.targetAmount)}</strong>
-                  </div>
-                  <div className="browse-progress-compact-track" aria-hidden="true">
-                    <span style={{ width: `${eventHub.progressPercent}%` }} />
-                  </div>
-                  <div className="browse-progress-compact-footer">
-                    <span>{formatWholeMoney(eventHub.totalRaised)} raised</span>
-                    <strong>{formatWholeMoney(eventHub.amountRemaining)} remaining</strong>
-                  </div>
-                </section>
+            <section className="browse-progress-compact" aria-label="Fundraising progress">
+              <div className="browse-progress-compact-header">
+                <span>Donation target</span>
+                <strong>{formatWholeMoney(eventHub.targetAmount)}</strong>
               </div>
-            </div>
+              <div className="browse-progress-compact-track" aria-hidden="true">
+                <span style={{ width: `${eventHub.progressPercent}%` }} />
+              </div>
+              <div className="browse-progress-compact-footer">
+                <span>{formatWholeMoney(eventHub.totalRaised)} raised</span>
+                <strong>{formatWholeMoney(eventHub.amountRemaining)} remaining</strong>
+              </div>
+            </section>
 
             <div className="browse-event-copy">
               <span className={`browse-event-status is-${eventHub.display.phase}`}>
@@ -436,7 +432,7 @@ function EventStat({
   value: number;
 }) {
   return (
-    <div>
+    <div className="browse-stat-card">
       <strong>{value}</strong>
       <span>{label}</span>
       <Icon size={16} aria-hidden="true" />
