@@ -3205,8 +3205,8 @@ p {
   align-items: center;
   aspect-ratio: 1;
   background:
-    linear-gradient(135deg, rgba(206, 251, 4, 0.2), rgba(255, 255, 255, 0.78)),
-    #eef2ed;
+    linear-gradient(135deg, rgba(206, 251, 4, 0.14), rgba(255, 255, 255, 0.82)),
+    #eff3ef;
   border: 1px solid rgba(206, 251, 4, 0.48);
   border-radius: 12px;
   box-shadow:
@@ -3220,18 +3220,16 @@ p {
   width: 100%;
 }
 
+.browse-event-logo > svg {
+  color: rgba(72, 83, 78, 0.64);
+}
+
 .browse-event-logo span {
   background-position: center;
   background-size: cover;
   display: block;
   height: 100%;
   width: 100%;
-}
-
-.browse-event-logo strong {
-  font-size: 1.58rem;
-  font-weight: 900;
-  letter-spacing: 0;
 }
 
 .browse-event-copy {
