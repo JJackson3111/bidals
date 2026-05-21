@@ -3482,7 +3482,13 @@ p {
   display: grid;
   gap: 9px;
   padding: 9px;
+  position: relative;
   text-align: left;
+}
+
+.browse-liked-card.is-outbid {
+  border-color: rgba(177, 54, 54, 0.18);
+  box-shadow: 0 0 0 1px rgba(177, 54, 54, 0.08), 0 10px 22px rgba(129, 27, 27, 0.055);
 }
 
 .browse-liked-card .browse-lot-image {
@@ -3611,6 +3617,16 @@ p {
   color: #8d3430;
 }
 
+.browse-liked-outbid-badge {
+  left: 17px;
+  top: 17px;
+}
+
+.browse-lot-detail.is-outbid {
+  border-color: rgba(177, 54, 54, 0.16);
+  box-shadow: 0 0 0 1px rgba(177, 54, 54, 0.08), 0 14px 30px rgba(129, 27, 27, 0.06);
+}
+
 .browse-detail-carousel {
   display: flex;
   inset: 50% 12px auto;
@@ -3683,6 +3699,17 @@ p {
   font-size: 1.05rem;
   font-weight: 900;
   margin: 0;
+}
+
+.browse-outbid-note {
+  background: rgba(255, 243, 241, 0.82);
+  border: 1px solid rgba(177, 54, 54, 0.16);
+  border-radius: 8px;
+  color: #8d3430;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.45;
+  padding: 11px 12px;
 }
 
 .browse-detail-bid {
@@ -3770,6 +3797,11 @@ p {
 
 .browse-lot-tile.is-outbid {
   box-shadow: 0 0 0 1px rgba(177, 54, 54, 0.18), 0 10px 24px rgba(129, 27, 27, 0.08);
+}
+
+.browse-lot-tile.is-outbid .browse-lot-tile-button {
+  border-color: rgba(177, 54, 54, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(177, 54, 54, 0.035);
 }
 
 .browse-lot-tile.is-selected {
