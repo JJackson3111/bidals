@@ -327,7 +327,6 @@ export function BrowseAuctionsExperience() {
               </span>
               <h1>{eventHub.auction.title}</h1>
               <p>{eventHub.auction.description || "Bid generously across curated lots supporting this fundraising event."}</p>
-              <span className="browse-powered">Powered by BIDALS</span>
             </div>
           </div>
         </div>
@@ -452,8 +451,9 @@ function LikedLotCard({
   const imageUrl = getLotPrimaryImageUrl(lot);
 
   return (
-    <button className="browse-liked-card" onClick={() => onSelect(lot.id)} type="button">
+    <button className={`browse-liked-card ${bidState.isOutbid ? "is-outbid" : ""}`} onClick={() => onSelect(lot.id)} type="button">
       <LotImage imageUrl={imageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+      {bidState.isOutbid ? <span className="browse-outbid-badge browse-liked-outbid-badge">Outbid</span> : null}
       <span className="browse-liked-title">{lot.title}</span>
       <strong>{formatWholeMoney(lot.current_price)}</strong>
     </button>
@@ -549,7 +549,12 @@ function SelectedLotPanel({
   };
 
   return (
-    <section className="browse-lot-detail" ref={detailRef} tabIndex={-1} aria-label={`Selected lot: ${lot.title}`}>
+    <section
+      className={`browse-lot-detail ${bidState.isOutbid ? "is-outbid" : ""}`}
+      ref={detailRef}
+      tabIndex={-1}
+      aria-label={`Selected lot: ${lot.title}`}
+    >
       <div className="browse-detail-media">
         <LotImage imageUrl={activeImageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
         <span className="browse-image-counter">
@@ -599,6 +604,10 @@ function SelectedLotPanel({
             <dd>{bidState.watcherCount}</dd>
           </div>
         </dl>
+
+        {bidState.isOutbid ? (
+          <p className="browse-outbid-note">You have been outbid. Open the secure lot page to place your next bid.</p>
+        ) : null}
 
         <div className="browse-detail-bid">
           <div className="browse-detail-bid-header">
@@ -692,7 +701,7 @@ function buildEventHub({
   const display = getAuctionDisplayState(auction, nowMs);
   const lotBidStates: Record<number, LotBidState> = {};
   const acceptedBids = lots.flatMap((lot) => {
-    const bidState = buildLotBidState(lot, bidHistoryByLotId[lot.id] ?? [], userId);
+    const bidState = getLotBidStatus(lot, bidHistoryByLotId[lot.id] ?? [], userId);
     lotBidStates[lot.id] = bidState;
     return bidState.acceptedBids;
   });
@@ -729,23 +738,69 @@ function buildEventHub({
   };
 }
 
-function buildLotBidState(lot: Lot, bids: Bid[], userId: number | null): LotBidState {
+function getLotBidStatus(lot: Lot, bids: Bid[], userId: number | null): LotBidState {
   const acceptedBids = bids.filter((bid) => bid.status === "accepted");
-  const highestBid = [...acceptedBids].sort((first, second) => parseMoney(second.amount) - parseMoney(first.amount))[0] ?? null;
+  const highestBid = getHighestAcceptedBid(acceptedBids);
   const userBids = userId === null ? [] : acceptedBids.filter((bid) => bid.bidder === userId);
   const userHighestBid = Math.max(0, ...userBids.map((bid) => parseMoney(bid.amount)));
-  const highestAmount = highestBid ? parseMoney(highestBid.amount) : parseMoney(lot.current_price);
+  const highestAmount = Math.max(highestBid ? parseMoney(highestBid.amount) : 0, parseMoney(lot.current_price));
   const bidderCount = new Set(acceptedBids.map((bid) => bid.bidder || bid.bidder_username).filter(Boolean)).size;
+  // TODO: If bid history becomes unavailable or partial, prefer backend fields such as
+  // has_user_bid, is_user_highest_bidder, user_highest_bid_amount, current_highest_bidder_id,
+  // and current_bid_amount instead of guessing an outbid state.
 
   return {
     acceptedBids,
     bidderCount,
     hasUserBid: userBids.length > 0,
     highestBid,
-    isOutbid: userBids.length > 0 && highestAmount > userHighestBid && highestBid?.bidder !== userId,
+    isOutbid: isLotOutbidForCurrentUser({
+      highestAmount,
+      highestBid,
+      userBids,
+      userHighestBid,
+      userId,
+    }),
     userBidCount: userBids.length,
     watcherCount: Math.max(1, bidderCount * 2 + (acceptedBids.length > 0 ? 1 : 0)),
   };
+}
+
+function getHighestAcceptedBid(acceptedBids: Bid[]): Bid | null {
+  return [...acceptedBids].sort(compareBidsByRank)[0] ?? null;
+}
+
+function compareBidsByRank(first: Bid, second: Bid): number {
+  const amountDelta = parseMoney(second.amount) - parseMoney(first.amount);
+  if (amountDelta !== 0) return amountDelta;
+
+  const firstMs = new Date(first.server_timestamp).getTime();
+  const secondMs = new Date(second.server_timestamp).getTime();
+  if (Number.isFinite(firstMs) && Number.isFinite(secondMs) && secondMs !== firstMs) {
+    return secondMs - firstMs;
+  }
+
+  return second.id - first.id;
+}
+
+function isLotOutbidForCurrentUser({
+  highestAmount,
+  highestBid,
+  userBids,
+  userHighestBid,
+  userId,
+}: {
+  highestAmount: number;
+  highestBid: Bid | null;
+  userBids: Bid[];
+  userHighestBid: number;
+  userId: number | null;
+}): boolean {
+  if (userId === null || userBids.length === 0) return false;
+
+  const currentBidIsHigherThanUserBid = highestAmount > userHighestBid;
+  const highestBidBelongsToAnotherBidder = highestBid !== null && highestBid.bidder !== userId;
+  return currentBidIsHigherThanUserBid || highestBidBelongsToAnotherBidder;
 }
 
 function phaseRank(phase: AuctionPhase): number {
