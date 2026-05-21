@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -296,7 +297,7 @@ export function BrowseAuctionsExperience() {
                 {eventLogoUrl ? (
                   <span style={{ backgroundImage: `url("${eventLogoUrl}")` }} />
                 ) : (
-                  <strong>{getEventInitials(eventHub.auction.title)}</strong>
+                  <Camera size={30} strokeWidth={1.7} aria-hidden="true" />
                 )}
               </div>
 
@@ -761,16 +762,6 @@ function phaseRank(phase: AuctionPhase): number {
 
 function safeTime(value: number): number {
   return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
-}
-
-function getEventInitials(title: string): string {
-  const initials = title
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.slice(0, 1).toUpperCase())
-    .join("");
-  return initials || "EV";
 }
 
 function deriveTargetAmount(lots: Lot[], totalRaised: number): number {
