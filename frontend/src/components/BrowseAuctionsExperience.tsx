@@ -290,14 +290,39 @@ export function BrowseAuctionsExperience() {
     <main className="browse-page browse-event-page">
       <section className="browse-event-hero">
         <div className="browse-container">
-          <div className="browse-event-header">
-            <div className="browse-event-logo" aria-label={`${eventHub.auction.title} logo`}>
-              {eventLogoUrl ? (
-                <span style={{ backgroundImage: `url("${eventLogoUrl}")` }} />
-              ) : (
-                <strong>{getEventInitials(eventHub.auction.title)}</strong>
-              )}
+          <div className="browse-event-summary">
+            <div className="browse-event-summary-top">
+              <div className="browse-event-logo" aria-label={`${eventHub.auction.title} logo`}>
+                {eventLogoUrl ? (
+                  <span style={{ backgroundImage: `url("${eventLogoUrl}")` }} />
+                ) : (
+                  <strong>{getEventInitials(eventHub.auction.title)}</strong>
+                )}
+              </div>
+
+              <div className="browse-event-summary-main">
+                <section className="browse-bidder-stats browse-bidder-stats-compact" aria-label="Your event stats">
+                  <EventStat icon={Sparkles} label="Bids made" value={eventHub.bidsMade} />
+                  <EventStat icon={Ticket} label="Raffle tickets" value={eventHub.raffleTickets} />
+                  <EventStat icon={Trophy} label="Won lots" value={eventHub.wonLots} />
+                </section>
+
+                <section className="browse-progress-compact" aria-label="Fundraising progress">
+                  <div className="browse-progress-compact-header">
+                    <span>Donation target</span>
+                    <strong>{formatWholeMoney(eventHub.targetAmount)}</strong>
+                  </div>
+                  <div className="browse-progress-compact-track" aria-hidden="true">
+                    <span style={{ width: `${eventHub.progressPercent}%` }} />
+                  </div>
+                  <div className="browse-progress-compact-footer">
+                    <span>{formatWholeMoney(eventHub.totalRaised)} raised</span>
+                    <strong>{formatWholeMoney(eventHub.amountRemaining)} remaining</strong>
+                  </div>
+                </section>
+              </div>
             </div>
+
             <div className="browse-event-copy">
               <span className={`browse-event-status is-${eventHub.display.phase}`}>
                 {eventHub.display.phase === "live" ? <i aria-hidden="true" /> : null}
@@ -308,40 +333,10 @@ export function BrowseAuctionsExperience() {
               <span className="browse-powered">Powered by BIDALS</span>
             </div>
           </div>
-
-          <section className="browse-bidder-stats" aria-label="Your event stats">
-            <EventStat icon={Sparkles} label="Bids made" value={eventHub.bidsMade} />
-            <EventStat icon={Ticket} label="Raffle tickets" value={eventHub.raffleTickets} />
-            <EventStat icon={Trophy} label="Won lots" value={eventHub.wonLots} />
-          </section>
         </div>
       </section>
 
       <div className="browse-container browse-event-stack">
-        <section className="browse-progress-panel" aria-label="Fundraising progress">
-          <div className="browse-progress-copy">
-            <span>Fundraising progress</span>
-            <strong>{formatWholeMoney(eventHub.totalRaised)}</strong>
-          </div>
-          <div className="browse-progress-track" aria-hidden="true">
-            <span style={{ width: `${eventHub.progressPercent}%` }} />
-          </div>
-          <dl className="browse-progress-meta">
-            <div>
-              <dt>Target</dt>
-              <dd>{formatWholeMoney(eventHub.targetAmount)}</dd>
-            </div>
-            <div>
-              <dt>Raised</dt>
-              <dd>{formatWholeMoney(eventHub.totalRaised)}</dd>
-            </div>
-            <div>
-              <dt>Remaining</dt>
-              <dd>{formatWholeMoney(eventHub.amountRemaining)}</dd>
-            </div>
-          </dl>
-        </section>
-
         <section className="browse-event-actions" aria-label="Event actions">
           <button type="button" onClick={() => setActionMessage("Donation checkout is not enabled for this event yet.")}>
             <Gift size={18} aria-hidden="true" />
@@ -441,9 +436,9 @@ function EventStat({
 }) {
   return (
     <div>
-      <Icon size={18} aria-hidden="true" />
-      <span>{label}</span>
       <strong>{value}</strong>
+      <span>{label}</span>
+      <Icon size={16} aria-hidden="true" />
     </div>
   );
 }
@@ -706,10 +701,9 @@ function buildEventHub({
   });
   const bidderCount = new Set(acceptedBids.map((bid) => bid.bidder || bid.bidder_username).filter(Boolean)).size;
   const totalRaised = lots.reduce((sum, lot) => sum + parseMoney(lot.current_price), 0);
-  const targetAmount = Math.max(
-    getOptionalMoneyField(auction, ["donation_target", "fundraising_target", "target_amount"]) ?? 0,
-    deriveTargetAmount(lots, totalRaised),
-  );
+  const providedTargetAmount = getOptionalMoneyField(auction, ["donation_target", "fundraising_target", "target_amount"]);
+  // TODO: Remove this derived display fallback once every event exposes a fundraising target.
+  const targetAmount = providedTargetAmount && providedTargetAmount > 0 ? providedTargetAmount : deriveTargetAmount(lots, totalRaised);
   const amountRemaining = Math.max(0, targetAmount - totalRaised);
   const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((totalRaised / targetAmount) * 100)) : 0;
   const userAcceptedBids = userId === null ? [] : acceptedBids.filter((bid) => bid.bidder === userId);
@@ -729,6 +723,7 @@ function buildEventHub({
     lotBidStates,
     lots,
     progressPercent,
+    // TODO: Replace with API-provided raffle tickets sold/purchased for this bidder/event.
     raffleTickets: 0,
     targetAmount,
     totalRaised,
