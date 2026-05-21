@@ -327,7 +327,6 @@ export function BrowseAuctionsExperience() {
               </span>
               <h1>{eventHub.auction.title}</h1>
               <p>{eventHub.auction.description || "Bid generously across curated lots supporting this fundraising event."}</p>
-              <span className="browse-powered">Powered by BIDALS</span>
             </div>
           </div>
         </div>
