@@ -322,9 +322,6 @@ export function BrowseAuctionsExperience() {
           <div className="browse-progress-copy">
             <span>Fundraising progress</span>
             <strong>{formatWholeMoney(eventHub.totalRaised)}</strong>
-            <p>
-              {formatWholeMoney(eventHub.amountRemaining)} remaining of {formatWholeMoney(eventHub.targetAmount)}
-            </p>
           </div>
           <div className="browse-progress-track" aria-hidden="true">
             <span style={{ width: `${eventHub.progressPercent}%` }} />
