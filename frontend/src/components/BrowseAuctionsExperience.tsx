@@ -4,65 +4,74 @@ import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Eye,
-  Flame,
-  Gavel,
+  Gift,
+  Heart,
   Minus,
   Plus,
-  Search,
-  TrendingUp,
-  Users,
+  Share2,
+  Sparkles,
+  Ticket,
+  Trophy,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 
+import { useAuth } from "@/components/AuthProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
 import { api, ApiError } from "@/lib/api";
 import { getAuctionDisplayState, phaseFromAuctionStatus, type AuctionPhase } from "@/lib/auctionLifecycle";
 import { formatMoney, getLotPrimaryImageUrl } from "@/lib/format";
 import type { Auction, Bid, Lot } from "@/lib/types";
 
-const FILTERS = [
-  "All",
-  "Live",
-  "Ending soon",
-  "Upcoming",
-  "Art",
-  "Travel",
-  "Experiences",
-  "Memorabilia",
-];
-
 const ONE_HOUR_MS = 60 * 60 * 1000;
+const DEFAULT_TARGET_AMOUNT = 10000;
 
-type AuctionSummary = {
-  auction: Auction;
-  bidIncrement: number;
+type LotBidState = {
+  acceptedBids: Bid[];
   bidderCount: number;
-  bidsLastHour: number;
-  currentBid: number;
-  display: ReturnType<typeof getAuctionDisplayState>;
-  featuredLot: Lot | null;
-  imageUrls: string[];
-  lots: Lot[];
-  reserveMet: boolean;
-  totalRaised: number;
+  hasUserBid: boolean;
+  highestBid: Bid | null;
+  isOutbid: boolean;
+  userBidCount: number;
   watcherCount: number;
 };
 
+type EventHub = {
+  amountRemaining: number;
+  auction: Auction;
+  bidCount: number;
+  bidderCount: number;
+  bidsLastHour: number;
+  bidsMade: number;
+  display: ReturnType<typeof getAuctionDisplayState>;
+  lotBidStates: Record<number, LotBidState>;
+  lots: Lot[];
+  progressPercent: number;
+  raffleTickets: number;
+  targetAmount: number;
+  totalRaised: number;
+  watcherCount: number;
+  wonLots: number;
+};
+
 export function BrowseAuctionsExperience() {
+  const { user } = useAuth();
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [bidHistoryByLotId, setBidHistoryByLotId] = useState<Record<number, Bid[]>>({});
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [likedLotIds, setLikedLotIds] = useState<number[]>([]);
+  const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [actionMessage, setActionMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lotError, setLotError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState<number | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
   const refreshInFlight = useRef(false);
   const lastLifecycleRefreshKey = useRef<string | null>(null);
 
@@ -133,22 +142,54 @@ export function BrowseAuctionsExperience() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const summaries = useMemo(
-    () => buildAuctionSummaries({ auctions, bidHistoryByLotId, lots, nowMs }),
-    [auctions, bidHistoryByLotId, lots, nowMs],
+  const selectedAuction = useMemo(
+    () => selectPrimaryAuction(auctions, nowMs),
+    [auctions, nowMs],
   );
 
+  const eventHub = useMemo(
+    () => selectedAuction
+      ? buildEventHub({
+        auction: selectedAuction,
+        bidHistoryByLotId,
+        lots: lots.filter((lot) => lot.auction === selectedAuction.id),
+        nowMs,
+        userId: user?.id ?? null,
+      })
+      : null,
+    [bidHistoryByLotId, lots, nowMs, selectedAuction, user?.id],
+  );
+  const selectedAuctionId = selectedAuction?.id ?? null;
+
   useEffect(() => {
-    if (nowMs === null || summaries.length === 0) return;
+    if (selectedAuctionId === null) {
+      setLikedLotIds([]);
+      return;
+    }
 
-    const staleAuction = summaries.find((summary) => {
-      const statusPhase = phaseFromAuctionStatus(summary.auction.status);
-      return statusPhase !== null && statusPhase !== summary.display.phase;
-    });
+    setLikedLotIds(readLikedLots(selectedAuctionId));
+  }, [selectedAuctionId]);
 
-    if (!staleAuction) return;
+  useEffect(() => {
+    if (!eventHub) {
+      setSelectedLotId(null);
+      return;
+    }
 
-    const refreshKey = `${staleAuction.auction.id}:${staleAuction.auction.status}:${staleAuction.display.phase}`;
+    const selectedStillVisible = selectedLotId !== null && eventHub.lots.some((lot) => lot.id === selectedLotId);
+    if (!selectedStillVisible) {
+      setSelectedLotId(eventHub.lots[0]?.id ?? null);
+    }
+  }, [eventHub, selectedLotId]);
+
+  useEffect(() => {
+    if (!eventHub || nowMs === null) return;
+
+    const statusPhase = phaseFromAuctionStatus(eventHub.auction.status);
+    const backendLooksStale = statusPhase !== null && statusPhase !== eventHub.display.phase;
+    if (!backendLooksStale) return;
+
+    const refreshKey = `${eventHub.auction.id}:${eventHub.auction.status}:${eventHub.display.phase}`;
     if (lastLifecycleRefreshKey.current === refreshKey || refreshInFlight.current) return;
 
     lastLifecycleRefreshKey.current = refreshKey;
@@ -158,22 +199,66 @@ export function BrowseAuctionsExperience() {
       .finally(() => {
         refreshInFlight.current = false;
       });
-  }, [loadBrowseData, nowMs, summaries]);
+  }, [eventHub, loadBrowseData, nowMs]);
 
-  const visibleSummaries = useMemo(
-    () => summaries.filter((summary) => matchesBrowseFilters(summary, activeFilter, searchQuery)),
-    [activeFilter, searchQuery, summaries],
+  const selectedLot = useMemo(
+    () => eventHub?.lots.find((lot) => lot.id === selectedLotId) ?? eventHub?.lots[0] ?? null,
+    [eventHub, selectedLotId],
   );
 
-  const liveCount = summaries.filter((summary) => summary.display.phase === "live").length;
-  const upcomingCount = summaries.filter((summary) => summary.display.phase === "scheduled").length;
-  const totalLots = summaries.reduce((sum, summary) => sum + summary.lots.length, 0);
+  const likedLots = useMemo(
+    () => eventHub?.lots.filter((lot) => likedLotIds.includes(lot.id)) ?? [],
+    [eventHub, likedLotIds],
+  );
+
+  const handleSelectLot = useCallback((lotId: number) => {
+    setSelectedLotId(lotId);
+    setSelectedImageIndex(0);
+    window.requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      detailRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const handleToggleLikedLot = useCallback((lotId: number) => {
+    if (!eventHub) return;
+
+    setLikedLotIds((current) => {
+      const next = current.includes(lotId)
+        ? current.filter((id) => id !== lotId)
+        : [...current, lotId];
+      writeLikedLots(eventHub.auction.id, next);
+      return next;
+    });
+  }, [eventHub]);
+
+  const handleShare = useCallback(async () => {
+    if (!eventHub) return;
+
+    const shareUrl = `${window.location.origin}/auctions/${eventHub.auction.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: eventHub.auction.title,
+          text: eventHub.auction.description || "View this BIDALS event.",
+          url: shareUrl,
+        });
+        setActionMessage("Event shared.");
+        return;
+      }
+
+      await navigator.clipboard?.writeText(shareUrl);
+      setActionMessage("Event link copied.");
+    } catch {
+      setActionMessage("Share was not completed.");
+    }
+  }, [eventHub]);
 
   if (isLoading) {
     return (
       <main className="browse-page">
         <div className="browse-container">
-          <LoadingState label="Loading auctions" />
+          <LoadingState label="Loading event" />
         </div>
       </main>
     );
@@ -189,339 +274,518 @@ export function BrowseAuctionsExperience() {
     );
   }
 
-  return (
-    <main className="browse-page">
-      <section className="browse-hero">
+  if (!eventHub) {
+    return (
+      <main className="browse-page">
         <div className="browse-container">
-          <div className="browse-hero-copy">
-            <span className="eyebrow browse-eyebrow">Auction floor</span>
-            <h1>Browse live auctions</h1>
+          <EmptyState title="No active event" message="A live or scheduled auction event will appear here." />
+        </div>
+      </main>
+    );
+  }
+
+  const eventLogoUrl = getOptionalStringField(eventHub.auction, ["logo_url", "event_logo", "customer_logo_url"]);
+
+  return (
+    <main className="browse-page browse-event-page">
+      <section className="browse-event-hero">
+        <div className="browse-container">
+          <div className="browse-event-header">
+            <div className="browse-event-logo" aria-label={`${eventHub.auction.title} logo`}>
+              {eventLogoUrl ? (
+                <span style={{ backgroundImage: `url("${eventLogoUrl}")` }} />
+              ) : (
+                <strong>{getEventInitials(eventHub.auction.title)}</strong>
+              )}
+            </div>
+            <div className="browse-event-copy">
+              <span className={`browse-event-status is-${eventHub.display.phase}`}>
+                {eventHub.display.phase === "live" ? <i aria-hidden="true" /> : null}
+                {eventHub.display.badgeLabel}
+              </span>
+              <h1>{eventHub.auction.title}</h1>
+              <p>{eventHub.auction.description || "Bid generously across curated lots supporting this fundraising event."}</p>
+              <span className="browse-powered">Powered by BIDALS</span>
+            </div>
+          </div>
+
+          <section className="browse-bidder-stats" aria-label="Your event stats">
+            <EventStat icon={Sparkles} label="Bids made" value={eventHub.bidsMade} />
+            <EventStat icon={Ticket} label="Raffle tickets" value={eventHub.raffleTickets} />
+            <EventStat icon={Trophy} label="Won lots" value={eventHub.wonLots} />
+          </section>
+        </div>
+      </section>
+
+      <div className="browse-container browse-event-stack">
+        <section className="browse-progress-panel" aria-label="Fundraising progress">
+          <div className="browse-progress-copy">
+            <span>Fundraising progress</span>
+            <strong>{formatWholeMoney(eventHub.totalRaised)}</strong>
             <p>
-              Discover premium charity auctions, exclusive experiences, and curated lots built for confident,
-              backend-authoritative bidding.
+              {formatWholeMoney(eventHub.amountRemaining)} remaining of {formatWholeMoney(eventHub.targetAmount)}
             </p>
           </div>
-
-          <dl className="browse-hero-stats" aria-label="Browse summary">
+          <div className="browse-progress-track" aria-hidden="true">
+            <span style={{ width: `${eventHub.progressPercent}%` }} />
+          </div>
+          <dl className="browse-progress-meta">
             <div>
-              <dt>Live now</dt>
-              <dd>{liveCount}</dd>
+              <dt>Target</dt>
+              <dd>{formatWholeMoney(eventHub.targetAmount)}</dd>
             </div>
             <div>
-              <dt>Upcoming</dt>
-              <dd>{upcomingCount}</dd>
+              <dt>Raised</dt>
+              <dd>{formatWholeMoney(eventHub.totalRaised)}</dd>
             </div>
             <div>
-              <dt>Lots visible</dt>
-              <dd>{totalLots}</dd>
+              <dt>Remaining</dt>
+              <dd>{formatWholeMoney(eventHub.amountRemaining)}</dd>
             </div>
           </dl>
-        </div>
-      </section>
+        </section>
 
-      <section className="browse-toolbar" aria-label="Auction search and filters">
-        <div className="browse-container">
-          <div className="browse-search">
-            <Search size={20} aria-hidden="true" />
-            <label className="browse-sr-only" htmlFor="browse-auction-search">
-              Search auctions
-            </label>
-            <input
-              id="browse-auction-search"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search auctions..."
-              type="search"
-              value={searchQuery}
-            />
+        <section className="browse-event-actions" aria-label="Event actions">
+          <button type="button" onClick={() => setActionMessage("Donation checkout is not enabled for this event yet.")}>
+            <Gift size={18} aria-hidden="true" />
+            Donate
+          </button>
+          <button type="button" onClick={() => setActionMessage("Raffle tickets are not enabled for this event yet.")}>
+            <Ticket size={18} aria-hidden="true" />
+            Raffle Tickets
+          </button>
+          <button type="button" onClick={handleShare}>
+            <Share2 size={18} aria-hidden="true" />
+            Share
+          </button>
+          <span className="browse-action-status" role="status">{actionMessage}</span>
+        </section>
+
+        {lotError ? (
+          <div className="browse-soft-alert" role="status">
+            Lot details could not be loaded. {lotError}
+          </div>
+        ) : null}
+
+        <section className="browse-liked-section" aria-labelledby="browse-liked-title">
+          <div className="browse-section-heading">
+            <span>Saved for later</span>
+            <h2 id="browse-liked-title">Liked lots</h2>
+          </div>
+          <div className="browse-liked-strip">
+            {likedLots.length > 0 ? (
+              likedLots.map((lot) => (
+                <LikedLotCard
+                  bidState={eventHub.lotBidStates[lot.id]}
+                  key={lot.id}
+                  lot={lot}
+                  onSelect={handleSelectLot}
+                />
+              ))
+            ) : (
+              <div className="browse-liked-empty">
+                <Heart size={18} aria-hidden="true" />
+                <span>Tap hearts on lots to build your shortlist.</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {selectedLot ? (
+          <SelectedLotPanel
+            bidState={eventHub.lotBidStates[selectedLot.id]}
+            detailRef={detailRef}
+            imageIndex={selectedImageIndex}
+            lot={selectedLot}
+            onImageIndexChange={setSelectedImageIndex}
+            phase={eventHub.display.phase}
+            timeLabel={formatAuctionTime(eventHub.auction, eventHub.display.phase)}
+          />
+        ) : null}
+
+        <section className="browse-lot-feed" aria-labelledby="browse-lot-feed-title">
+          <div className="browse-section-heading">
+            <span>{eventHub.lots.length} lots in this event</span>
+            <h2 id="browse-lot-feed-title">Bid the room</h2>
           </div>
 
-          <div className="browse-filters" role="list" aria-label="Auction filters">
-            {FILTERS.map((filter) => (
-              <button
-                aria-pressed={activeFilter === filter}
-                className={`browse-filter-button ${activeFilter === filter ? "is-active" : ""}`}
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                type="button"
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-
-          {lotError ? (
-            <div className="browse-soft-alert" role="status">
-              Lot details could not be loaded, so cards are showing auction-level information only. {lotError}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="browse-results" aria-label="Auction results">
-        <div className="browse-container">
-          {summaries.length === 0 ? (
-            <EmptyState title="No auctions yet" message="New auctions will appear here when sellers publish them." />
-          ) : visibleSummaries.length === 0 ? (
-            <EmptyState title="No matching auctions" message="Adjust your search or filter to see more auctions." />
+          {eventHub.lots.length === 0 ? (
+            <EmptyState title="No lots visible" message="Lots will appear here when this event opens them." />
           ) : (
-            <div className="browse-grid">
-              {visibleSummaries.map((summary) => (
-                <BrowseAuctionCard key={summary.auction.id} summary={summary} />
+            <div className="browse-lot-grid">
+              {eventHub.lots.map((lot) => (
+                <LotTile
+                  bidState={eventHub.lotBidStates[lot.id]}
+                  isLiked={likedLotIds.includes(lot.id)}
+                  isSelected={selectedLot?.id === lot.id}
+                  key={lot.id}
+                  lot={lot}
+                  onSelect={handleSelectLot}
+                  onToggleLiked={handleToggleLikedLot}
+                  timeLabel={formatAuctionTime(eventHub.auction, eventHub.display.phase)}
+                />
               ))}
             </div>
           )}
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
 
-function BrowseAuctionCard({ summary }: { summary: AuctionSummary }) {
-  const [imageIndex, setImageIndex] = useState(0);
-  const minimumBid = summary.currentBid + summary.bidIncrement;
+function EventStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div>
+      <Icon size={18} aria-hidden="true" />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function LikedLotCard({
+  bidState,
+  lot,
+  onSelect,
+}: {
+  bidState: LotBidState;
+  lot: Lot;
+  onSelect: (lotId: number) => void;
+}) {
+  const imageUrl = getLotPrimaryImageUrl(lot);
+
+  return (
+    <button className="browse-liked-card" onClick={() => onSelect(lot.id)} type="button">
+      <LotImage imageUrl={imageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+      <span className="browse-liked-title">{lot.title}</span>
+      <strong>{formatWholeMoney(lot.current_price)}</strong>
+    </button>
+  );
+}
+
+function LotTile({
+  bidState,
+  isLiked,
+  isSelected,
+  lot,
+  onSelect,
+  onToggleLiked,
+  timeLabel,
+}: {
+  bidState: LotBidState;
+  isLiked: boolean;
+  isSelected: boolean;
+  lot: Lot;
+  onSelect: (lotId: number) => void;
+  onToggleLiked: (lotId: number) => void;
+  timeLabel: string;
+}) {
+  const imageUrl = getLotPrimaryImageUrl(lot);
+
+  return (
+    <article className={`browse-lot-tile ${bidState.isOutbid ? "is-outbid" : ""} ${isSelected ? "is-selected" : ""}`}>
+      <button className="browse-lot-tile-button" onClick={() => onSelect(lot.id)} type="button">
+        <LotImage imageUrl={imageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+        <span className={`browse-lot-status ${bidState.isOutbid ? "status-outbid" : `status-${lot.status}`}`}>
+          {bidState.isOutbid ? "Outbid" : lot.status}
+        </span>
+        <div className="browse-lot-tile-body">
+          <h3>{lot.title}</h3>
+          <div>
+            <strong>{formatWholeMoney(lot.current_price)}</strong>
+            <span>
+              <Clock size={12} aria-hidden="true" />
+              {timeLabel}
+            </span>
+          </div>
+        </div>
+      </button>
+      <button
+        aria-label={`${isLiked ? "Remove" : "Save"} ${lot.title}`}
+        aria-pressed={isLiked}
+        className={`browse-save-lot ${isLiked ? "is-liked" : ""}`}
+        onClick={() => onToggleLiked(lot.id)}
+        type="button"
+      >
+        <Heart size={16} aria-hidden="true" />
+      </button>
+    </article>
+  );
+}
+
+function SelectedLotPanel({
+  bidState,
+  detailRef,
+  imageIndex,
+  lot,
+  onImageIndexChange,
+  phase,
+  timeLabel,
+}: {
+  bidState: LotBidState;
+  detailRef: MutableRefObject<HTMLElement | null>;
+  imageIndex: number;
+  lot: Lot;
+  onImageIndexChange: (index: number) => void;
+  phase: AuctionPhase;
+  timeLabel: string;
+}) {
+  const imageUrls = getLotImageUrls(lot);
+  const imageCount = Math.max(1, imageUrls.length);
+  const activeImageUrl = imageUrls[imageIndex] ?? null;
+  const minimumBid = parseMoney(lot.current_price) + parseMoney(lot.bid_increment);
   const [bidAmount, setBidAmount] = useState(minimumBid);
+  const buyNowPrice = getOptionalMoneyField(lot, ["buy_now_price", "buyNowPrice", "buy_now"]);
+  const canBid = phase === "live" && lot.status === "open";
 
   useEffect(() => {
-    setImageIndex(0);
+    onImageIndexChange(0);
     setBidAmount(minimumBid);
-  }, [minimumBid, summary.auction.id]);
-
-  const imageCount = getCardImageCount(summary);
-  const activeImageUrl = summary.imageUrls[imageIndex] ?? null;
-  const activeLot = summary.lots[imageIndex] ?? summary.featuredLot;
-  const mediaLabel = activeLot?.title ?? summary.auction.title;
-  const canStepImages = imageCount > 1;
-  const canBid = summary.display.phase === "live" && Boolean(summary.featuredLot);
-  const bidTargetHref = summary.featuredLot ? `/lots/${summary.featuredLot.id}` : `/auctions/${summary.auction.id}`;
+  }, [lot.id, minimumBid, onImageIndexChange]);
 
   const handlePreviousImage = () => {
-    setImageIndex((current) => (current > 0 ? current - 1 : imageCount - 1));
+    onImageIndexChange(imageIndex > 0 ? imageIndex - 1 : imageCount - 1);
   };
 
   const handleNextImage = () => {
-    setImageIndex((current) => (current + 1) % imageCount);
-  };
-
-  const handleDecreaseBid = () => {
-    setBidAmount((current) => Math.max(minimumBid, current - summary.bidIncrement));
-  };
-
-  const handleIncreaseBid = () => {
-    setBidAmount((current) => current + summary.bidIncrement);
+    onImageIndexChange((imageIndex + 1) % imageCount);
   };
 
   return (
-    <article className="browse-auction-card">
-      <div className="browse-card-media">
-        {activeImageUrl ? (
-          <div
-            aria-label={mediaLabel}
-            className="browse-card-image"
-            role="img"
-            style={{ backgroundImage: `url("${activeImageUrl}")` }}
-          />
-        ) : (
-          <div className="browse-card-placeholder" aria-hidden="true">
-            <Gavel size={42} aria-hidden="true" />
-            <span>{mediaLabel}</span>
-          </div>
-        )}
-
-        <div className="browse-media-overlay" aria-hidden="true" />
-
-        <span className="browse-lots-badge">{summary.lots.length} lots</span>
-        <span className="browse-image-count">
+    <section className="browse-lot-detail" ref={detailRef} tabIndex={-1} aria-label={`Selected lot: ${lot.title}`}>
+      <div className="browse-detail-media">
+        <LotImage imageUrl={activeImageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+        <span className="browse-image-counter">
           {imageIndex + 1}/{imageCount}
         </span>
-        <span className={`browse-status-badge is-${summary.display.phase}`}>
-          {summary.display.phase === "live" ? <span className="browse-live-dot" aria-hidden="true" /> : null}
-          {summary.display.badgeLabel}
-        </span>
-
-        {canStepImages ? (
-          <div className="browse-media-controls">
-            <button
-              aria-label={`Previous image for ${summary.auction.title}`}
-              onClick={handlePreviousImage}
-              type="button"
-            >
+        {bidState.isOutbid ? <span className="browse-outbid-badge">Outbid</span> : null}
+        {imageCount > 1 ? (
+          <div className="browse-detail-carousel">
+            <button aria-label={`Previous image for ${lot.title}`} onClick={handlePreviousImage} type="button">
               <ChevronLeft size={18} aria-hidden="true" />
             </button>
-            <button
-              aria-label={`Next image for ${summary.auction.title}`}
-              onClick={handleNextImage}
-              type="button"
-            >
+            <button aria-label={`Next image for ${lot.title}`} onClick={handleNextImage} type="button">
               <ChevronRight size={18} aria-hidden="true" />
             </button>
           </div>
         ) : null}
       </div>
 
-      <div className="browse-card-body">
-        <div className="browse-card-heading">
-          <Link className="browse-card-title-link" href={`/auctions/${summary.auction.id}`}>
-            <h2>{summary.auction.title}</h2>
-          </Link>
-          <p>{summary.auction.description || "No description provided."}</p>
+      <div className="browse-detail-body">
+        <div className="browse-detail-heading">
+          <span className="browse-detail-kicker">Selected lot</span>
+          <h2>{lot.title}</h2>
+          <p>{lot.description || lot.auction_title}</p>
         </div>
 
-        <div className="browse-value-row">
+        <dl className="browse-detail-metrics">
           <div>
-            <span>{summary.display.phase === "scheduled" ? "Starting value" : "Raised value"}</span>
-            <strong>{formatWholeMoney(summary.totalRaised)}</strong>
+            <dt>Current bid</dt>
+            <dd>{formatWholeMoney(lot.current_price)}</dd>
           </div>
-          <div className="browse-time-pill">
-            <Clock size={15} aria-hidden="true" />
-            <span>{formatAuctionTime(summary.auction, summary.display.phase)}</span>
-          </div>
-        </div>
-
-        <div className="browse-signal-grid" aria-label={`Auction signals for ${summary.auction.title}`}>
-          <span>
-            <Users size={14} aria-hidden="true" />
-            {summary.bidderCount} bidders
-          </span>
-          <span>
-            <Eye size={14} aria-hidden="true" />
-            {summary.watcherCount} watching
-          </span>
-          <span>
-            <TrendingUp size={14} aria-hidden="true" />
-            {summary.bidsLastHour} bids/hr
-          </span>
-          <span className={summary.reserveMet ? "is-accent" : ""}>
-            <CheckCircle2 size={14} aria-hidden="true" />
-            {summary.reserveMet ? "Reserve met" : "Reserve pending"}
-          </span>
-          <span className="is-accent">
-            <BadgeCheck size={14} aria-hidden="true" />
-            Verified seller
-          </span>
-          {summary.bidsLastHour >= 3 ? (
-            <span className="is-accent">
-              <Flame size={14} aria-hidden="true" />
-              Trending
-            </span>
+          {buyNowPrice !== null ? (
+            <div>
+              <dt>Buy now</dt>
+              <dd>{formatWholeMoney(buyNowPrice)}</dd>
+            </div>
           ) : null}
-        </div>
-
-        <div className="browse-bid-module">
-          <div className="browse-bid-module-header">
-            <span>Quick bid</span>
-            <small>Increment {formatWholeMoney(summary.bidIncrement)}</small>
+          <div>
+            <dt>Timer</dt>
+            <dd>{timeLabel}</dd>
           </div>
+          <div>
+            <dt>Bidders</dt>
+            <dd>{bidState.bidderCount}</dd>
+          </div>
+          <div>
+            <dt>Watching</dt>
+            <dd>{bidState.watcherCount}</dd>
+          </div>
+        </dl>
 
-          <div className="browse-bid-controls">
+        <div className="browse-detail-bid">
+          <div className="browse-detail-bid-header">
+            <span>Bid amount</span>
+            <small>Increment {formatWholeMoney(lot.bid_increment)}</small>
+          </div>
+          <div className="browse-detail-bid-row">
             <button
-              aria-label={`Decrease bid amount for ${summary.auction.title}`}
+              aria-label={`Decrease bid amount for ${lot.title}`}
               disabled={!canBid || bidAmount <= minimumBid}
-              onClick={handleDecreaseBid}
+              onClick={() => setBidAmount((current) => Math.max(minimumBid, current - parseMoney(lot.bid_increment)))}
               type="button"
             >
               <Minus size={16} aria-hidden="true" />
             </button>
-            <label className="browse-bid-input">
+            <label>
               <span>Bid amount</span>
-              <input
-                aria-describedby={`browse-bid-note-${summary.auction.id}`}
-                inputMode="decimal"
-                readOnly
-                type="text"
-                value={formatWholeMoney(bidAmount)}
-              />
+              <input inputMode="decimal" readOnly type="text" value={formatWholeMoney(bidAmount)} />
             </label>
             <button
-              aria-label={`Increase bid amount for ${summary.auction.title}`}
+              aria-label={`Increase bid amount for ${lot.title}`}
               disabled={!canBid}
-              onClick={handleIncreaseBid}
+              onClick={() => setBidAmount((current) => current + parseMoney(lot.bid_increment))}
               type="button"
             >
               <Plus size={16} aria-hidden="true" />
             </button>
           </div>
-
-          <small className="browse-bid-note" id={`browse-bid-note-${summary.auction.id}`}>
-            Final bid acceptance happens on the secure lot page.
-          </small>
-
-          {canBid ? (
-            <Link className="browse-primary-bid" href={bidTargetHref}>
-              Place bid
-            </Link>
-          ) : (
-            <button className="browse-primary-bid" disabled type="button">
-              Place bid
-            </button>
-          )}
+          <Link className="browse-place-bid" href={`/lots/${lot.id}`}>
+            Place bid
+            <ArrowRight size={16} aria-hidden="true" />
+          </Link>
         </div>
-
-        <Link className="browse-open-link" href={`/auctions/${summary.auction.id}`}>
-          Open auction
-          <ArrowRight size={16} aria-hidden="true" />
-        </Link>
       </div>
-    </article>
+    </section>
   );
 }
 
-function buildAuctionSummaries({
-  auctions,
+function LotImage({
+  imageUrl,
+  isOutbid,
+  label,
+}: {
+  imageUrl: string | null;
+  isOutbid?: boolean;
+  label: string;
+}) {
+  return imageUrl ? (
+    <span
+      aria-label={label}
+      className={`browse-lot-image ${isOutbid ? "is-outbid" : ""}`}
+      role="img"
+      style={{ backgroundImage: `url("${imageUrl}")` }}
+    />
+  ) : (
+    <span className={`browse-lot-image browse-lot-placeholder ${isOutbid ? "is-outbid" : ""}`} aria-hidden="true">
+      <BadgeCheck size={26} aria-hidden="true" />
+      <span>{label.slice(0, 1).toUpperCase()}</span>
+    </span>
+  );
+}
+
+function selectPrimaryAuction(auctions: Auction[], nowMs: number | null): Auction | null {
+  if (auctions.length === 0) return null;
+
+  return [...auctions].sort((first, second) => {
+    const firstDisplay = getAuctionDisplayState(first, nowMs);
+    const secondDisplay = getAuctionDisplayState(second, nowMs);
+    const phaseDelta = phaseRank(firstDisplay.phase) - phaseRank(secondDisplay.phase);
+    if (phaseDelta !== 0) return phaseDelta;
+
+    const firstTime = new Date(firstDisplay.phase === "scheduled" ? first.start_time : first.end_time).getTime();
+    const secondTime = new Date(secondDisplay.phase === "scheduled" ? second.start_time : second.end_time).getTime();
+    return safeTime(firstTime) - safeTime(secondTime);
+  })[0] ?? null;
+}
+
+function buildEventHub({
+  auction,
   bidHistoryByLotId,
   lots,
   nowMs,
+  userId,
 }: {
-  auctions: Auction[];
+  auction: Auction;
   bidHistoryByLotId: Record<number, Bid[]>;
   lots: Lot[];
   nowMs: number | null;
-}): AuctionSummary[] {
-  return auctions.map((auction) => {
-    const auctionLots = lots.filter((lot) => lot.auction === auction.id);
-    const featuredLot = chooseFeaturedLot(auctionLots);
-    const currentBid = Math.max(0, ...auctionLots.map((lot) => parseMoney(lot.current_price)));
-    const totalRaised = auctionLots.reduce((sum, lot) => sum + parseMoney(lot.current_price), 0);
-    const bidIncrement = Math.max(1, parseMoney(featuredLot?.bid_increment ?? "50"));
-    const acceptedBids = auctionLots.flatMap((lot) => (
-      bidHistoryByLotId[lot.id] ?? []
-    ).filter((bid) => bid.status === "accepted"));
-    const bidderKeys = acceptedBids.map((bid) => String(bid.bidder || bid.bidder_username)).filter(Boolean);
-    const bidders = new Set(bidderKeys);
-    const display = getAuctionDisplayState(auction, nowMs);
-    const bidsLastHour = acceptedBids.filter((bid) => {
-      const bidMs = new Date(bid.server_timestamp).getTime();
-      return Number.isFinite(bidMs) && Date.now() - bidMs <= ONE_HOUR_MS;
-    }).length;
-    const watcherCount = Math.max(0, bidders.size + Math.max(0, auctionLots.length - 1));
-    const reserveMet = auctionLots.some((lot) => {
-      const reserve = lot.reserve_price ? parseMoney(lot.reserve_price) : null;
-      return reserve !== null && parseMoney(lot.current_price) >= reserve;
-    });
-    const imageUrls = auctionLots.flatMap((lot) => getLotImageUrls(lot));
-
-    return {
-      auction,
-      bidIncrement,
-      bidderCount: bidders.size,
-      bidsLastHour,
-      currentBid,
-      display,
-      featuredLot,
-      imageUrls,
-      lots: auctionLots,
-      reserveMet,
-      totalRaised,
-      watcherCount,
-    };
+  userId: number | null;
+}): EventHub {
+  const display = getAuctionDisplayState(auction, nowMs);
+  const lotBidStates: Record<number, LotBidState> = {};
+  const acceptedBids = lots.flatMap((lot) => {
+    const bidState = buildLotBidState(lot, bidHistoryByLotId[lot.id] ?? [], userId);
+    lotBidStates[lot.id] = bidState;
+    return bidState.acceptedBids;
   });
+  const bidderCount = new Set(acceptedBids.map((bid) => bid.bidder || bid.bidder_username).filter(Boolean)).size;
+  const totalRaised = lots.reduce((sum, lot) => sum + parseMoney(lot.current_price), 0);
+  const targetAmount = Math.max(
+    getOptionalMoneyField(auction, ["donation_target", "fundraising_target", "target_amount"]) ?? 0,
+    deriveTargetAmount(lots, totalRaised),
+  );
+  const amountRemaining = Math.max(0, targetAmount - totalRaised);
+  const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((totalRaised / targetAmount) * 100)) : 0;
+  const userAcceptedBids = userId === null ? [] : acceptedBids.filter((bid) => bid.bidder === userId);
+  const bidsLastHour = acceptedBids.filter((bid) => {
+    const bidMs = new Date(bid.server_timestamp).getTime();
+    return Number.isFinite(bidMs) && (nowMs ?? Date.now()) - bidMs <= ONE_HOUR_MS;
+  }).length;
+
+  return {
+    amountRemaining,
+    auction,
+    bidCount: acceptedBids.length,
+    bidderCount,
+    bidsLastHour,
+    bidsMade: userAcceptedBids.length,
+    display,
+    lotBidStates,
+    lots,
+    progressPercent,
+    raffleTickets: 0,
+    targetAmount,
+    totalRaised,
+    watcherCount: lots.reduce((sum, lot) => sum + (lotBidStates[lot.id]?.watcherCount ?? 0), 0),
+    wonLots: userId === null ? 0 : lots.filter((lot) => lot.winner === userId).length,
+  };
 }
 
-function chooseFeaturedLot(lots: Lot[]): Lot | null {
-  if (lots.length === 0) return null;
+function buildLotBidState(lot: Lot, bids: Bid[], userId: number | null): LotBidState {
+  const acceptedBids = bids.filter((bid) => bid.status === "accepted");
+  const highestBid = [...acceptedBids].sort((first, second) => parseMoney(second.amount) - parseMoney(first.amount))[0] ?? null;
+  const userBids = userId === null ? [] : acceptedBids.filter((bid) => bid.bidder === userId);
+  const userHighestBid = Math.max(0, ...userBids.map((bid) => parseMoney(bid.amount)));
+  const highestAmount = highestBid ? parseMoney(highestBid.amount) : parseMoney(lot.current_price);
+  const bidderCount = new Set(acceptedBids.map((bid) => bid.bidder || bid.bidder_username).filter(Boolean)).size;
 
-  const openLots = lots.filter((lot) => lot.status === "open");
-  const candidates = openLots.length > 0 ? openLots : lots;
-  return [...candidates].sort((first, second) => parseMoney(second.current_price) - parseMoney(first.current_price))[0] ?? null;
+  return {
+    acceptedBids,
+    bidderCount,
+    hasUserBid: userBids.length > 0,
+    highestBid,
+    isOutbid: userBids.length > 0 && highestAmount > userHighestBid && highestBid?.bidder !== userId,
+    userBidCount: userBids.length,
+    watcherCount: Math.max(1, bidderCount * 2 + (acceptedBids.length > 0 ? 1 : 0)),
+  };
+}
+
+function phaseRank(phase: AuctionPhase): number {
+  if (phase === "live") return 0;
+  if (phase === "scheduled") return 1;
+  if (phase === "closed") return 2;
+  if (phase === "draft") return 3;
+  return 4;
+}
+
+function safeTime(value: number): number {
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function getEventInitials(title: string): string {
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("");
+  return initials || "EV";
+}
+
+function deriveTargetAmount(lots: Lot[], totalRaised: number): number {
+  const reserveTotal = lots.reduce((sum, lot) => sum + parseMoney(lot.reserve_price ?? 0), 0);
+  const startingTotal = lots.reduce((sum, lot) => sum + parseMoney(lot.starting_price), 0);
+  const base = Math.max(reserveTotal, startingTotal, totalRaised * 1.5, DEFAULT_TARGET_AMOUNT);
+  return Math.ceil(base / 1000) * 1000;
 }
 
 function getLotImageUrls(lot: Lot): string[] {
@@ -531,33 +795,49 @@ function getLotImageUrls(lot: Lot): string[] {
   return Array.from(new Set([primary, ...uploadedUrls, ...legacyUrls].filter(Boolean) as string[]));
 }
 
-function getCardImageCount(summary: AuctionSummary): number {
-  if (summary.imageUrls.length > 0) return summary.imageUrls.length;
-  return Math.max(1, Math.min(summary.lots.length || 1, 4));
+function getOptionalStringField(source: unknown, keys: string[]): string | null {
+  const record = source as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+  return null;
 }
 
-function matchesBrowseFilters(summary: AuctionSummary, activeFilter: string, searchQuery: string): boolean {
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-  const haystack = [
-    summary.auction.title,
-    summary.auction.description,
-    summary.auction.created_by_username,
-    ...summary.lots.flatMap((lot) => [lot.title, lot.description]),
-  ].join(" ").toLowerCase();
-
-  if (normalizedSearch && !haystack.includes(normalizedSearch)) {
-    return false;
+function getOptionalMoneyField(source: unknown, keys: string[]): number | null {
+  const record = source as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" || typeof value === "number") {
+      const parsed = parseMoney(value);
+      if (parsed > 0) return parsed;
+    }
   }
+  return null;
+}
 
-  if (activeFilter === "All") return true;
-  if (activeFilter === "Live") return summary.display.phase === "live";
-  if (activeFilter === "Upcoming") return summary.display.phase === "scheduled";
-  if (activeFilter === "Ending soon") {
-    const endMs = new Date(summary.auction.end_time).getTime();
-    return summary.display.phase === "live" && Number.isFinite(endMs) && endMs - Date.now() <= ONE_HOUR_MS;
+function readLikedLots(auctionId: number): number[] {
+  try {
+    const raw = window.localStorage.getItem(likedLotsStorageKey(auctionId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((value): value is number => Number.isInteger(value)) : [];
+  } catch {
+    return [];
   }
+}
 
-  return haystack.includes(activeFilter.toLowerCase());
+function writeLikedLots(auctionId: number, lotIds: number[]) {
+  try {
+    window.localStorage.setItem(likedLotsStorageKey(auctionId), JSON.stringify(lotIds));
+  } catch {
+    // Saving a shortlist is optional; browsing should continue if storage is unavailable.
+  }
+}
+
+function likedLotsStorageKey(auctionId: number): string {
+  return `bidals:liked-lots:${auctionId}`;
 }
 
 function formatAuctionTime(auction: Auction, phase: AuctionPhase): string {
