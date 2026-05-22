@@ -367,13 +367,22 @@ def test_seeded_premium_demo_remains_visible_in_public_search():
 
     premium_auction_id = search_response.data["results"][0]["id"]
     lot_response = client.get("/api/lots/", {"auction": premium_auction_id})
+    auction_detail_response = client.get(f"/api/auctions/{premium_auction_id}/")
 
     assert lot_response.status_code == 200
-    assert [lot["title"] for lot in lot_response.data["results"]] == [
+    lot_results = lot_response.data["results"]
+    assert [lot["title"] for lot in lot_results] == [
         "[Demo] Starter Wine Cellar",
         "[Demo] Reserve Swiss Watch Set",
         "[Demo] Increment Travel Retreat",
     ]
+    assert auction_detail_response.status_code == 200
+    assert auction_detail_response.data["title"] == "[Demo] BIDALS Premium Benefit Auction"
+
+    for lot in lot_results:
+        lot_detail_response = client.get(f"/api/lots/{lot['id']}/")
+        assert lot_detail_response.status_code == 200
+        assert lot_detail_response.data["title"] == lot["title"]
 
 
 def test_public_browse_allows_generic_smoke_test_titles_created_by_e2e():
