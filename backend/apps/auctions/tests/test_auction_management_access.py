@@ -1,8 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -326,6 +328,81 @@ def test_public_browse_hides_legacy_smoke_data_and_orders_live_demo_first():
         "BIDALS Demo Auction_1",
         "[STAGING TEST AUCTION] Live Governance Sale",
     }
+
+
+def test_seeded_premium_demo_remains_visible_in_public_search():
+    legacy_seller = create_user("legacy_seller", role=UserRole.SELLER)
+    phase17_auction = create_auction(
+        seller=legacy_seller,
+        title="PHASE17 SMOKE AUCTION 1777996033",
+        status=AuctionStatus.ENDED,
+    )
+    old_demo_auction = create_auction(
+        seller=legacy_seller,
+        title="BIDALS Demo Auction_1",
+        status=AuctionStatus.ENDED,
+    )
+    create_lot(auction=phase17_auction, title="PHASE17 SMOKE LOT 1777996033", status=LotStatus.SOLD)
+    create_lot(auction=old_demo_auction, title="Test Sweet", status=LotStatus.CLOSED)
+
+    call_command("seed_demo", stdout=StringIO())
+
+    client = APIClient()
+    search_response = client.get("/api/auctions/", {"search": "Premium"})
+    browse_response = client.get("/api/auctions/")
+
+    assert search_response.status_code == 200
+    assert search_response.data["count"] >= 1
+    search_titles = [auction["title"] for auction in search_response.data["results"]]
+    assert search_titles[0] == "[Demo] BIDALS Premium Benefit Auction"
+    assert "[Demo] BIDALS Premium Benefit Auction" in search_titles
+    assert "PHASE17 SMOKE AUCTION 1777996033" not in search_titles
+    assert "BIDALS Demo Auction_1" not in search_titles
+
+    assert browse_response.status_code == 200
+    browse_titles = [auction["title"] for auction in browse_response.data["results"]]
+    assert browse_titles[0] == "[Demo] BIDALS Premium Benefit Auction"
+    assert "PHASE17 SMOKE AUCTION 1777996033" not in browse_titles
+    assert "BIDALS Demo Auction_1" not in browse_titles
+
+    premium_auction_id = search_response.data["results"][0]["id"]
+    lot_response = client.get("/api/lots/", {"auction": premium_auction_id})
+
+    assert lot_response.status_code == 200
+    assert [lot["title"] for lot in lot_response.data["results"]] == [
+        "[Demo] Starter Wine Cellar",
+        "[Demo] Reserve Swiss Watch Set",
+        "[Demo] Increment Travel Retreat",
+    ]
+
+
+def test_public_browse_allows_generic_smoke_test_titles_created_by_e2e():
+    seller = create_user("seller", role=UserRole.SELLER)
+    smoke_auction = create_auction(
+        seller=seller,
+        title="Smoke Auction 1779475628423 Edited",
+        status=AuctionStatus.LIVE,
+    )
+    smoke_lot = create_lot(
+        auction=smoke_auction,
+        title="Smoke Lot 1779475628423 Edited",
+        status=LotStatus.OPEN,
+    )
+
+    client = APIClient()
+    auction_list_response = client.get("/api/auctions/", {"search": "Smoke Auction"})
+    auction_detail_response = client.get(f"/api/auctions/{smoke_auction.id}/")
+    lot_list_response = client.get("/api/lots/", {"auction": smoke_auction.id})
+    lot_detail_response = client.get(f"/api/lots/{smoke_lot.id}/")
+
+    assert auction_list_response.status_code == 200
+    assert [auction["id"] for auction in auction_list_response.data["results"]] == [smoke_auction.id]
+    assert auction_detail_response.status_code == 200
+    assert auction_detail_response.data["title"] == "Smoke Auction 1779475628423 Edited"
+    assert lot_list_response.status_code == 200
+    assert [lot["id"] for lot in lot_list_response.data["results"]] == [smoke_lot.id]
+    assert lot_detail_response.status_code == 200
+    assert lot_detail_response.data["title"] == "Smoke Lot 1779475628423 Edited"
 
 
 def test_admin_browsing_can_see_all_auctions_and_lots():
