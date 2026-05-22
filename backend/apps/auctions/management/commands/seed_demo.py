@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
 from apps.auctions.models import Auction, AuctionStatus, Bid, Lot, LotStatus
+from apps.auctions.public_browse import public_browse_test_auction_query
 from apps.auctions.services.bidding import place_bid
 
 
@@ -45,95 +46,113 @@ class Command(BaseCommand):
             )
 
             self._clear_existing_demo_data(seller=seller)
+            archived_legacy_count = self._archive_legacy_public_test_auctions()
 
             now = timezone.now()
             live_auction = self._create_auction(
                 seller=seller,
-                title="[Demo] Estate Watches Live Drop",
-                description="A live sale of serviced vintage watches and collector-grade accessories.",
+                title="[Demo] BIDALS Premium Benefit Auction",
+                description="A polished live demo event featuring premium lots for fundraising guests.",
                 start_time=now - timedelta(minutes=25),
                 end_time=now + timedelta(hours=2),
                 status=AuctionStatus.LIVE,
             )
             scheduled_auction = self._create_auction(
                 seller=seller,
-                title="[Demo] Designer Furniture Preview",
-                description="A scheduled auction for compact apartment pieces, lighting, and studio seating.",
+                title="[Demo] Collector Experiences Preview",
+                description="A scheduled preview of premium experiences and collector-grade lots.",
                 start_time=now + timedelta(days=1),
                 end_time=now + timedelta(days=1, hours=3),
                 status=AuctionStatus.SCHEDULED,
             )
             ended_auction = self._create_auction(
                 seller=seller,
-                title="[Demo] Archive Tech Collectibles",
-                description="A completed auction showing historical bid and audit activity.",
+                title="[Demo] Completed Supporter Showcase",
+                description="A completed demo auction showing historical bid and audit activity.",
                 start_time=now - timedelta(days=2),
                 end_time=now - timedelta(days=1, hours=20),
                 status=AuctionStatus.ENDED,
             )
 
-            chronograph = self._create_lot(
+            starter_cellar = self._create_lot(
                 auction=live_auction,
-                title="[Demo] 1960s Stainless Chronograph",
-                description="A manually wound chronograph with a clean dial, serviced movement, and original bracelet.",
-                starting_price=Decimal("240.00"),
-                reserve_price=Decimal("320.00"),
-                bid_increment=Decimal("10.00"),
+                title="[Demo] Starter Wine Cellar",
+                description="A curated premium wine case with tasting notes and a private sommelier handover.",
+                images=[
+                    "/demo-lots/wine-hero.webp",
+                    "/demo-lots/wine-detail.webp",
+                    "/demo-lots/wine-lifestyle.webp",
+                ],
+                starting_price=Decimal("300.00"),
+                reserve_price=Decimal("450.00"),
+                bid_increment=Decimal("25.00"),
                 status=LotStatus.OPEN,
             )
-            print_lot = self._create_lot(
+            reserve_watch = self._create_lot(
                 auction=live_auction,
-                title="[Demo] Signed Studio Print",
-                description="A framed limited print from a small-run urban photography series.",
-                starting_price=Decimal("120.00"),
-                reserve_price=None,
-                bid_increment=Decimal("5.00"),
+                title="[Demo] Reserve Swiss Watch Set",
+                description="A serviced automatic dress watch with box, strap roll, and collector presentation.",
+                images=[
+                    "/demo-lots/watch-hero.webp",
+                    "/demo-lots/watch-detail.webp",
+                    "/demo-lots/watch-box.webp",
+                ],
+                starting_price=Decimal("1200.00"),
+                reserve_price=Decimal("1800.00"),
+                bid_increment=Decimal("50.00"),
                 status=LotStatus.OPEN,
             )
-            camera = self._create_lot(
+            increment_retreat = self._create_lot(
                 auction=live_auction,
-                title="[Demo] Compact Cinema Camera Kit",
-                description="A clean body, cage, two batteries, and compact prime lens for mobile creators.",
-                starting_price=Decimal("900.00"),
-                reserve_price=Decimal("1100.00"),
+                title="[Demo] Increment Travel Retreat",
+                description="A two-night luxury retreat with spa access, chef dinner, and flexible guest dates.",
+                images=[
+                    "/demo-lots/vacation-resort.webp",
+                    "/demo-lots/vacation-room.webp",
+                    "/demo-lots/vacation-spa.webp",
+                    "/demo-lots/vacation-dinner.webp",
+                ],
+                starting_price=Decimal("1800.00"),
+                reserve_price=Decimal("2500.00"),
+                bid_increment=Decimal("100.00"),
+                status=LotStatus.OPEN,
+            )
+            self._create_lot(
+                auction=scheduled_auction,
+                title="[Demo] Private Dining Preview",
+                description="A scheduled chef's table preview for eight guests.",
+                images=["/demo-lots/vacation-dinner.webp"],
+                starting_price=Decimal("500.00"),
+                reserve_price=Decimal("750.00"),
                 bid_increment=Decimal("25.00"),
                 status=LotStatus.OPEN,
             )
             self._create_lot(
                 auction=scheduled_auction,
-                title="[Demo] Bentwood Lounge Chair Pair",
-                description="Two warm-toned lounge chairs with refreshed upholstery and low apartment scale.",
-                starting_price=Decimal("180.00"),
-                reserve_price=Decimal("260.00"),
-                bid_increment=Decimal("10.00"),
-                status=LotStatus.OPEN,
-            )
-            self._create_lot(
-                auction=scheduled_auction,
-                title="[Demo] Brass Task Lamp",
-                description="A compact adjustable lamp with patina and a newly rewired cord.",
-                starting_price=Decimal("65.00"),
+                title="[Demo] Reserve Cellar Preview",
+                description="A scheduled preview of a reserve wine pairing lot.",
+                images=["/demo-lots/wine-lifestyle.webp"],
+                starting_price=Decimal("250.00"),
                 reserve_price=None,
-                bid_increment=Decimal("5.00"),
+                bid_increment=Decimal("25.00"),
                 status=LotStatus.OPEN,
             )
             self._create_lot(
                 auction=ended_auction,
-                title="[Demo] First-Generation Handheld Console",
+                title="[Demo] Supporter Watch Lot",
                 description="A completed example lot with bidding closed.",
-                starting_price=Decimal("75.00"),
-                reserve_price=Decimal("100.00"),
-                bid_increment=Decimal("5.00"),
+                images=["/demo-lots/watch-detail.webp"],
+                starting_price=Decimal("500.00"),
+                reserve_price=Decimal("700.00"),
+                bid_increment=Decimal("50.00"),
                 status=LotStatus.SOLD,
             )
 
-            place_bid(bidder, chronograph.id, Decimal("250.00"))
-            place_bid(bidder_two, chronograph.id, Decimal("260.00"))
-            place_bid(bidder, chronograph.id, Decimal("255.00"))
-            place_bid(bidder_two, chronograph.id, Decimal("265.00"))
-            place_bid(bidder, print_lot.id, Decimal("125.00"))
-            place_bid(bidder_two, print_lot.id, Decimal("130.00"))
-            place_bid(bidder, camera.id, Decimal("925.00"))
+            place_bid(bidder, starter_cellar.id, Decimal("325.00"))
+            place_bid(bidder_two, starter_cellar.id, Decimal("350.00"))
+            place_bid(bidder, reserve_watch.id, Decimal("1250.00"))
+            place_bid(bidder_two, reserve_watch.id, Decimal("1300.00"))
+            place_bid(bidder, increment_retreat.id, Decimal("1900.00"))
 
             self._audit(
                 actor=admin,
@@ -142,7 +161,8 @@ class Command(BaseCommand):
                 entity_id="phase5",
                 metadata={
                     "demo_seed": True,
-                    "message": "Demo data refreshed for BIDALS Phase 5.",
+                    "archived_legacy_public_test_auctions": archived_legacy_count,
+                    "message": "Premium demo data refreshed for the BIDALS browse experience.",
                     "seller_id": seller.id,
                 },
             )
@@ -192,6 +212,17 @@ class Command(BaseCommand):
         AuditLog.objects.filter(audit_filter).delete()
         demo_auctions.delete()
 
+    def _archive_legacy_public_test_auctions(self):
+        legacy_auctions = Auction.objects.filter(public_browse_test_auction_query()).exclude(
+            status=AuctionStatus.CANCELLED
+        )
+        archived_count = legacy_auctions.update(status=AuctionStatus.CANCELLED)
+        if archived_count:
+            self.stdout.write(
+                self.style.WARNING(f"Archived {archived_count} legacy smoke/test auction(s).")
+            )
+        return archived_count
+
     def _create_auction(self, *, seller, title, description, start_time, end_time, status):
         auction = Auction.objects.create(
             title=title,
@@ -215,11 +246,23 @@ class Command(BaseCommand):
         )
         return auction
 
-    def _create_lot(self, *, auction, title, description, starting_price, reserve_price, bid_increment, status):
+    def _create_lot(
+        self,
+        *,
+        auction,
+        title,
+        description,
+        starting_price,
+        reserve_price,
+        bid_increment,
+        status,
+        images=None,
+    ):
         lot = Lot.objects.create(
             auction=auction,
             title=title,
             description=description,
+            images=images or [],
             starting_price=starting_price,
             current_price=starting_price,
             reserve_price=reserve_price,

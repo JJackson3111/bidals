@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -40,6 +40,10 @@ from apps.auctions.models import (
 from apps.auctions.permissions import (
     IsAuctionOwnerOrAdminOrReadOnly,
     IsLotOwnerOrAdminOrReadOnly,
+)
+from apps.auctions.public_browse import (
+    exclude_public_browse_test_auctions,
+    exclude_public_browse_test_lots,
 )
 from apps.auctions.serializers import (
     AuctionSerializer,
@@ -85,6 +89,22 @@ VISIBLE_LOT_STATUSES = (
     LotStatus.OPEN,
     LotStatus.CLOSED,
     LotStatus.SOLD,
+)
+
+
+PUBLIC_AUCTION_STATUS_ORDER = Case(
+    When(status=AuctionStatus.LIVE, then=Value(0)),
+    When(status=AuctionStatus.SCHEDULED, then=Value(1)),
+    When(status=AuctionStatus.ENDED, then=Value(2)),
+    default=Value(3),
+    output_field=IntegerField(),
+)
+PUBLIC_LOT_AUCTION_STATUS_ORDER = Case(
+    When(auction__status=AuctionStatus.LIVE, then=Value(0)),
+    When(auction__status=AuctionStatus.SCHEDULED, then=Value(1)),
+    When(auction__status=AuctionStatus.ENDED, then=Value(2)),
+    default=Value(3),
+    output_field=IntegerField(),
 )
 
 
@@ -512,7 +532,9 @@ class AuctionViewSet(viewsets.ModelViewSet):
         elif user.is_authenticated and user.can_sell:
             visible = queryset.filter(created_by=user)
         else:
-            visible = queryset.filter(status__in=VISIBLE_AUCTION_STATUSES)
+            visible = exclude_public_browse_test_auctions(
+                queryset.filter(status__in=VISIBLE_AUCTION_STATUSES)
+            )
 
         status_filter = self.request.query_params.get("status")
         if status_filter:
@@ -537,6 +559,14 @@ class AuctionViewSet(viewsets.ModelViewSet):
             visible = visible.order_by("end_time", "start_time")
         elif sort == "newest":
             visible = visible.order_by("-created_at", "-start_time")
+        elif not (user.is_authenticated and (user.is_platform_admin or user.can_sell)):
+            visible = visible.annotate(public_status_order=PUBLIC_AUCTION_STATUS_ORDER).order_by(
+                "public_status_order",
+                "end_time",
+                "start_time",
+                "-created_at",
+                "id",
+            )
 
         return visible
 
@@ -652,9 +682,11 @@ class LotViewSet(viewsets.ModelViewSet):
         elif user.is_authenticated and user.can_sell:
             visible = queryset.filter(auction__created_by=user)
         else:
-            visible = queryset.filter(
-                auction__status__in=VISIBLE_AUCTION_STATUSES,
-                status__in=VISIBLE_LOT_STATUSES,
+            visible = exclude_public_browse_test_lots(
+                queryset.filter(
+                    auction__status__in=VISIBLE_AUCTION_STATUSES,
+                    status__in=VISIBLE_LOT_STATUSES,
+                )
             )
 
         auction_id = self.request.query_params.get("auction")
@@ -688,6 +720,13 @@ class LotViewSet(viewsets.ModelViewSet):
             visible = visible.order_by("auction__end_time", "id")
         elif sort == "newest":
             visible = visible.order_by("-created_at", "-id")
+        elif not (user.is_authenticated and (user.is_platform_admin or user.can_sell)):
+            visible = visible.annotate(public_auction_status_order=PUBLIC_LOT_AUCTION_STATUS_ORDER).order_by(
+                "public_auction_status_order",
+                "auction__end_time",
+                "auction__start_time",
+                "id",
+            )
 
         return visible
 
