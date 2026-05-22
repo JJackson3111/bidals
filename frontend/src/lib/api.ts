@@ -34,10 +34,11 @@ import type {
 } from "@/lib/types";
 
 const LOCAL_API_BASE_URL = "http://localhost:8000/api";
-const RENDER_STAGING_API_BASE_URL = "https://bidals.onrender.com/api";
-const RENDER_STAGING_FRONTEND_HOSTS = new Set([
+const STAGING_API_BASE_URL = "https://bidals.onrender.com/api";
+const STAGING_FRONTEND_HOSTS = new Set([
   "bidals-frontend-staging.onrender.com",
   "bidals-1.onrender.com",
+  "demo.bidals.com",
 ]);
 
 export class ApiError extends Error {
@@ -86,8 +87,8 @@ function resolveApiBaseUrl(): string {
     return normalizeApiBaseUrl(configuredBaseUrl);
   }
 
-  if (browserHostname && RENDER_STAGING_FRONTEND_HOSTS.has(browserHostname)) {
-    return RENDER_STAGING_API_BASE_URL;
+  if (browserHostname && STAGING_FRONTEND_HOSTS.has(browserHostname)) {
+    return STAGING_API_BASE_URL;
   }
 
   if (configuredBaseUrlIsUnsafe) {
@@ -102,7 +103,18 @@ function resolveApiBaseUrl(): string {
 }
 
 function normalizeApiBaseUrl(value: string): string {
-  return value.replace(/\/+$/, "");
+  const trimmedValue = value.trim();
+
+  try {
+    const url = new URL(trimmedValue);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    url.pathname = normalizedPath || "/api";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmedValue.replace(/\/+$/, "");
+  }
 }
 
 function getBrowserHostname(): string | null {
@@ -137,7 +149,7 @@ async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
     }
   }
 
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     ...options,
     headers,
   });
@@ -151,7 +163,28 @@ async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
     throw new ApiError(message, response.status, body ?? {});
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  if (!isJson) {
+    throw new ApiError("Expected JSON response from API.", response.status, {
+      detail: textBody.trim() || "The API returned a non-JSON response.",
+    });
+  }
+
+  if (body === null) {
+    throw new ApiError("Invalid JSON response from API.", response.status, {
+      detail: "The API response could not be parsed as JSON.",
+    });
+  }
+
   return body as T;
+}
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${resolveApiBaseUrl()}${normalizedPath}`;
 }
 
 function extractErrorMessage(body: unknown): string | null {
@@ -425,7 +458,7 @@ export const api = {
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(`${resolveApiBaseUrl()}/admin/activity/export/${suffix}`, { headers });
+    const response = await fetch(buildApiUrl(`/admin/activity/export/${suffix}`), { headers });
     if (!response.ok) {
       const isJson = response.headers.get("content-type")?.includes("application/json");
       const body = isJson ? await response.json() : null;

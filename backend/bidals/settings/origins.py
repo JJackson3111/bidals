@@ -26,3 +26,10 @@ def configured_origins(env, names: Iterable[str], *, default: Iterable[str] = ()
         origins.extend(comma_separated_urls(default))
 
     return list(dict.fromkeys(origins))
+
+
+def merge_origins(*origin_groups: str | Iterable[str] | None) -> list[str]:
+    origins: list[str] = []
+    for group in origin_groups:
+        origins.extend(comma_separated_urls(group))
+    return list(dict.fromkeys(origins))
