@@ -3530,13 +3530,43 @@ p {
 }
 
 .browse-detail-media {
-  aspect-ratio: 4 / 3;
-  min-height: 310px;
+  aspect-ratio: 3 / 4;
+  min-height: min(560px, 78vh);
   overflow: hidden;
   position: relative;
 }
 
-.browse-detail-media .browse-lot-image {
+.browse-detail-gallery {
+  display: flex;
+  height: 100%;
+  outline: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.browse-detail-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.browse-detail-gallery:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(206, 251, 4, 0.84);
+}
+
+.browse-detail-gallery-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  min-width: 100%;
+  position: relative;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.browse-detail-media .browse-lot-image,
+.browse-detail-gallery-slide .browse-lot-image {
   height: 100%;
 }
 
@@ -3555,6 +3585,18 @@ p {
 .browse-lot-image-fill {
   object-fit: cover;
   object-position: center;
+}
+
+.browse-lot-image-fill.is-scenic-image {
+  object-position: center 40%;
+}
+
+.browse-detail-media .browse-lot-image-fill {
+  object-position: center 44%;
+}
+
+.browse-detail-media .browse-lot-image-fill.is-scenic-image {
+  object-position: center 34%;
 }
 
 .browse-lot-image::after {
@@ -3632,25 +3674,48 @@ p {
   box-shadow: 0 0 0 1px rgba(177, 54, 54, 0.08), 0 14px 30px rgba(129, 27, 27, 0.06);
 }
 
-.browse-detail-carousel {
-  display: flex;
-  inset: 50% 12px auto;
-  justify-content: space-between;
+.browse-gallery-dots {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  background: rgba(23, 33, 30, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 2px;
+  inset: auto auto 14px 50%;
+  justify-content: center;
+  padding: 5px 7px;
   position: absolute;
-  transform: translateY(-50%);
+  transform: translateX(-50%);
   z-index: 4;
 }
 
-.browse-detail-carousel button {
+.browse-gallery-dots button {
   align-items: center;
-  background: rgba(23, 33, 30, 0.56);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  color: #fff;
+  background: transparent;
+  border: 0;
   display: inline-flex;
-  height: 38px;
+  height: 18px;
   justify-content: center;
-  width: 38px;
+  padding: 0;
+  width: 18px;
+}
+
+.browse-gallery-dots button::before {
+  background: rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  content: "";
+  height: 6px;
+  transition:
+    background 160ms ease,
+    transform 160ms ease,
+    width 160ms ease;
+  width: 6px;
+}
+
+.browse-gallery-dots button.is-active::before {
+  background: #fff;
+  width: 16px;
 }
 
 .browse-detail-body {
@@ -3899,7 +3964,6 @@ p {
 @media (hover: hover) and (pointer: fine) {
   .browse-event-actions button:hover,
   .browse-liked-card:hover,
-  .browse-detail-carousel button:hover,
   .browse-detail-bid-row button:hover:not(:disabled),
   .browse-place-bid:hover,
   .browse-lot-tile-button:hover,
@@ -4072,6 +4136,7 @@ p {
   }
 
   .browse-detail-media {
+    aspect-ratio: auto;
     min-height: 100%;
   }
 
@@ -4099,9 +4164,9 @@ p {
   .browse-progress-compact-track span,
   .browse-event-actions button,
   .browse-liked-card,
-  .browse-detail-carousel button,
   .browse-detail-bid-row button,
   .browse-place-bid,
+  .browse-gallery-dots button::before,
   .browse-lot-tile-button,
   .browse-save-lot,
   .browse-auction-card,
@@ -4151,6 +4216,10 @@ p {
 
   .auction-progress-fill {
     width: 51%;
+  }
+
+  .browse-detail-gallery {
+    scroll-behavior: auto;
   }
 
   .landing-step {

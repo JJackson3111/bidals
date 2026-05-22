@@ -6,8 +6,6 @@ import {
   ArrowRight,
   BadgeCheck,
   Camera,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Gift,
   Heart,
@@ -20,7 +18,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MutableRefObject } from "react";
+import type { KeyboardEvent, MutableRefObject } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
@@ -524,7 +522,12 @@ function LikedLotCard({
 
   return (
     <button className={`browse-liked-card ${bidState.isOutbid ? "is-outbid" : ""}`} onClick={() => onSelect(lot.id)} type="button">
-      <LotImage imageUrl={imageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+      <LotImage
+        imagePositionClassName={getLotImagePositionClassName(lot, imageUrl)}
+        imageUrl={imageUrl}
+        isOutbid={bidState.isOutbid}
+        label={lot.title}
+      />
       {bidState.isOutbid ? <span className="browse-outbid-badge browse-liked-outbid-badge">Outbid</span> : null}
       <span className="browse-liked-title">{lot.title}</span>
       <strong>{formatWholeMoney(lot.current_price)}</strong>
@@ -554,7 +557,12 @@ function LotTile({
   return (
     <article className={`browse-lot-tile ${bidState.isOutbid ? "is-outbid" : ""} ${isSelected ? "is-selected" : ""}`}>
       <button className="browse-lot-tile-button" onClick={() => onSelect(lot.id)} type="button">
-        <LotImage imageUrl={imageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+        <LotImage
+          imagePositionClassName={getLotImagePositionClassName(lot, imageUrl)}
+          imageUrl={imageUrl}
+          isOutbid={bidState.isOutbid}
+          label={lot.title}
+        />
         <span className={`browse-lot-status ${bidState.isOutbid ? "status-outbid" : `status-${lot.status}`}`}>
           {bidState.isOutbid ? "Outbid" : lot.status}
         </span>
@@ -602,7 +610,7 @@ function SelectedLotPanel({
   const imageUrls = getResolvedLotImageUrls(lot);
   const imageCount = Math.max(1, imageUrls.length);
   const activeImageIndex = imageUrls.length > 0 ? Math.min(imageIndex, imageUrls.length - 1) : 0;
-  const activeImageUrl = imageUrls[activeImageIndex] ?? null;
+  const galleryRef = useRef<HTMLDivElement | null>(null);
   const minimumBid = parseMoney(lot.current_price) + parseMoney(lot.bid_increment);
   const [bidAmount, setBidAmount] = useState(minimumBid);
   const buyNowPrice = getOptionalMoneyField(lot, ["buy_now_price", "buyNowPrice", "buy_now"]);
@@ -610,15 +618,42 @@ function SelectedLotPanel({
 
   useEffect(() => {
     onImageIndexChange(0);
+    galleryRef.current?.scrollTo({ left: 0 });
     setBidAmount(minimumBid);
   }, [lot.id, minimumBid, onImageIndexChange]);
 
-  const handlePreviousImage = () => {
-    onImageIndexChange(imageIndex > 0 ? imageIndex - 1 : imageCount - 1);
-  };
+  const handleSelectImage = useCallback((nextIndex: number) => {
+    const boundedIndex = Math.min(Math.max(nextIndex, 0), imageCount - 1);
+    onImageIndexChange(boundedIndex);
+    const gallery = galleryRef.current;
+    gallery?.scrollTo({ left: gallery.clientWidth * boundedIndex, behavior: "smooth" });
+  }, [imageCount, onImageIndexChange]);
 
-  const handleNextImage = () => {
-    onImageIndexChange((imageIndex + 1) % imageCount);
+  const handleGalleryScroll = useCallback(() => {
+    const gallery = galleryRef.current;
+    if (!gallery || imageUrls.length === 0) return;
+
+    const nextIndex = Math.min(
+      imageUrls.length - 1,
+      Math.max(0, Math.round(gallery.scrollLeft / Math.max(1, gallery.clientWidth))),
+    );
+    if (nextIndex !== activeImageIndex) {
+      onImageIndexChange(nextIndex);
+    }
+  }, [activeImageIndex, imageUrls.length, onImageIndexChange]);
+
+  const handleGalleryKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (imageCount <= 1) return;
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      handleSelectImage(activeImageIndex > 0 ? activeImageIndex - 1 : imageCount - 1);
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      handleSelectImage((activeImageIndex + 1) % imageCount);
+    }
   };
 
   return (
@@ -629,19 +664,53 @@ function SelectedLotPanel({
       aria-label={`Selected lot: ${lot.title}`}
     >
       <div className="browse-detail-media">
-        <LotImage imageUrl={activeImageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
+        <div
+          aria-label={`Images for ${lot.title}`}
+          className="browse-detail-gallery"
+          onKeyDown={handleGalleryKeyDown}
+          onScroll={handleGalleryScroll}
+          ref={galleryRef}
+          role="listbox"
+          tabIndex={0}
+        >
+          {imageUrls.length > 0 ? (
+            imageUrls.map((imageUrl, index) => (
+              <div
+                aria-selected={index === activeImageIndex}
+                className="browse-detail-gallery-slide"
+                key={`${lot.id}-${imageUrl}`}
+                role="option"
+              >
+                <LotImage
+                  imagePositionClassName={getLotImagePositionClassName(lot, imageUrl)}
+                  imageUrl={imageUrl}
+                  isOutbid={bidState.isOutbid}
+                  label={`${lot.title} image ${index + 1}`}
+                />
+              </div>
+            ))
+          ) : (
+            <div aria-selected className="browse-detail-gallery-slide" role="option">
+              <LotImage imageUrl={null} isOutbid={bidState.isOutbid} label={lot.title} />
+            </div>
+          )}
+        </div>
         <span className="browse-image-counter">
           {activeImageIndex + 1}/{imageCount}
         </span>
         {bidState.isOutbid ? <span className="browse-outbid-badge">Outbid</span> : null}
         {imageCount > 1 ? (
-          <div className="browse-detail-carousel">
-            <button aria-label={`Previous image for ${lot.title}`} onClick={handlePreviousImage} type="button">
-              <ChevronLeft size={18} aria-hidden="true" />
-            </button>
-            <button aria-label={`Next image for ${lot.title}`} onClick={handleNextImage} type="button">
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
+          <div className="browse-gallery-dots" aria-label={`${lot.title} image pagination`} role="group">
+            {imageUrls.map((imageUrl, index) => (
+              <button
+                aria-current={index === activeImageIndex ? "true" : undefined}
+                aria-label={`Show image ${index + 1} of ${imageCount} for ${lot.title}`}
+                className={index === activeImageIndex ? "is-active" : ""}
+                key={`${lot.id}-${imageUrl}-dot`}
+                onClick={() => handleSelectImage(index)}
+                type="button"
+              />
+            ))}
           </div>
         ) : null}
       </div>
@@ -720,10 +789,12 @@ function SelectedLotPanel({
 }
 
 function LotImage({
+  imagePositionClassName = "",
   imageUrl,
   isOutbid,
   label,
 }: {
+  imagePositionClassName?: string;
   imageUrl: string | null;
   isOutbid?: boolean;
   label: string;
@@ -732,7 +803,7 @@ function LotImage({
     <span className={`browse-lot-image ${isOutbid ? "is-outbid" : ""}`}>
       <Image
         alt={label}
-        className="browse-lot-image-fill"
+        className={`browse-lot-image-fill ${imagePositionClassName}`}
         fill
         sizes="(min-width: 1080px) 25vw, (min-width: 720px) 50vw, 100vw"
         src={imageUrl}
@@ -929,6 +1000,14 @@ function getStagingDemoFallbackLotImageUrls(lot: Lot): string[] {
   const normalizedTitle = lot.title.toLowerCase();
   const fallback = STAGING_DEMO_LOT_IMAGE_FALLBACKS.find(({ titleFragment }) => normalizedTitle.includes(titleFragment));
   return fallback ? [...fallback.imageUrls] : [];
+}
+
+function getLotImagePositionClassName(lot: Lot, imageUrl: string | null): string {
+  const imageContext = `${lot.title} ${imageUrl ?? ""}`.toLowerCase();
+  if (imageContext.includes("vacation") || imageContext.includes("increment")) return "is-scenic-image";
+  if (imageContext.includes("watch") || imageContext.includes("reserve")) return "is-watch-image";
+  if (imageContext.includes("wine") || imageContext.includes("starter")) return "is-wine-image";
+  return "";
 }
 
 function addImageCollectionUrls(value: unknown, urls: string[]) {
