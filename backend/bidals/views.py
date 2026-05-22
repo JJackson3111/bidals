@@ -1,16 +1,47 @@
+import os
+from functools import lru_cache
+
 from django.conf import settings
 from django.core.cache import cache
+from django.core.management import get_commands
 from django.db import connection
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 
+def _runtime_environment():
+    return (
+        os.getenv("BIDALS_ENV")
+        or os.getenv("ENV")
+        or getattr(settings, "SENTRY_ENVIRONMENT", "")
+        or ("development" if settings.DEBUG else "production")
+    ).lower()
+
+
+@lru_cache(maxsize=1)
+def _demo_seed_available():
+    try:
+        return "seed_demo" in get_commands()
+    except Exception:
+        return False
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health_check(request):
-    return Response({"status": "ok", "service": "bidals-backend"})
+    return Response(
+        {
+            "status": "ok",
+            "service": "bidals-backend",
+            "environment": _runtime_environment(),
+            "allowed_frontend": getattr(settings, "FRONTEND_URL", ""),
+            "server_time": timezone.now().isoformat(),
+            "demo_seed_available": _demo_seed_available(),
+        }
+    )
 
 
 @api_view(["GET"])
