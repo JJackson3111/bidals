@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
-from bidals.settings.origins import comma_separated_urls, configured_origins
+from bidals.settings.origins import comma_separated_urls, configured_origins, merge_origins
 from bidals.settings.validation import missing_required_production_env, validate_rate_limit_settings
 
 pytestmark = pytest.mark.django_db
@@ -79,6 +79,23 @@ def test_origin_settings_accept_render_alias_env_names_and_comma_separated_value
         "https://legacy.example",
         "https://app.example",
         "https://bidals-frontend-staging.onrender.com",
+    ]
+
+
+def test_custom_frontend_origin_is_merged_with_explicit_render_origin(monkeypatch):
+    monkeypatch.delenv("DJANGO_CORS_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://bidals-1.onrender.com")
+
+    configured = configured_origins(
+        lambda name, default="": os.environ.get(name, default),
+        ("DJANGO_CORS_ALLOWED_ORIGINS", "CORS_ALLOWED_ORIGINS"),
+        default=["https://demo.bidals.com"],
+    )
+    origins = merge_origins(configured, ["https://demo.bidals.com"])
+
+    assert origins == [
+        "https://bidals-1.onrender.com",
+        "https://demo.bidals.com",
     ]
 
 
