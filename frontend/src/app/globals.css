@@ -3552,6 +3552,11 @@ p {
   width: 100%;
 }
 
+.browse-lot-image-fill {
+  object-fit: cover;
+  object-position: center;
+}
+
 .browse-lot-image::after {
   background: linear-gradient(180deg, rgba(23, 33, 30, 0.04), rgba(23, 33, 30, 0.22));
   content: "";

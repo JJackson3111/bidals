@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -25,11 +26,82 @@ import { useAuth } from "@/components/AuthProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
 import { api, ApiError } from "@/lib/api";
 import { getAuctionDisplayState, phaseFromAuctionStatus, type AuctionPhase } from "@/lib/auctionLifecycle";
-import { formatMoney, getLotPrimaryImageUrl } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import type { Auction, Bid, Lot } from "@/lib/types";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const DEFAULT_TARGET_AMOUNT = 10000;
+const DEMO_LOT_IMAGE_BASE_PATH = "/demo-lots";
+const API_LOT_IMAGE_FIELD_KEYS = [
+  "image_url",
+  "imageUrl",
+  "cover_image",
+  "coverImage",
+  "cover_image_url",
+  "coverImageUrl",
+  "image",
+  "primary_image",
+  "primaryImage",
+  "primary_image_url",
+  "primaryImageUrl",
+  "hero_image",
+  "heroImage",
+  "media_url",
+  "mediaUrl",
+  "thumbnail_url",
+  "thumbnailUrl",
+] as const;
+const API_LOT_IMAGE_COLLECTION_KEYS = [
+  "uploaded_images",
+  "images",
+  "media",
+  "photos",
+  "gallery",
+  "image_urls",
+  "imageUrls",
+  "lot_images",
+  "lotImages",
+] as const;
+const API_LOT_IMAGE_OBJECT_KEYS = [
+  "image_url",
+  "imageUrl",
+  "url",
+  "src",
+  "source",
+  "cover_image",
+  "coverImage",
+  "media_url",
+  "mediaUrl",
+  "thumbnail_url",
+  "thumbnailUrl",
+] as const;
+const STAGING_DEMO_LOT_IMAGE_FALLBACKS = [
+  {
+    titleFragment: "starter",
+    imageUrls: [
+      `${DEMO_LOT_IMAGE_BASE_PATH}/wine-hero.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/wine-detail.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/wine-lifestyle.webp`,
+    ],
+  },
+  {
+    titleFragment: "reserve",
+    imageUrls: [
+      `${DEMO_LOT_IMAGE_BASE_PATH}/watch-hero.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/watch-detail.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/watch-box.webp`,
+    ],
+  },
+  {
+    titleFragment: "increment",
+    imageUrls: [
+      `${DEMO_LOT_IMAGE_BASE_PATH}/vacation-resort.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/vacation-room.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/vacation-spa.webp`,
+      `${DEMO_LOT_IMAGE_BASE_PATH}/vacation-dinner.webp`,
+    ],
+  },
+] as const;
 
 type LotBidState = {
   acceptedBids: Bid[];
@@ -448,7 +520,7 @@ function LikedLotCard({
   lot: Lot;
   onSelect: (lotId: number) => void;
 }) {
-  const imageUrl = getLotPrimaryImageUrl(lot);
+  const imageUrl = getResolvedLotPrimaryImageUrl(lot);
 
   return (
     <button className={`browse-liked-card ${bidState.isOutbid ? "is-outbid" : ""}`} onClick={() => onSelect(lot.id)} type="button">
@@ -477,7 +549,7 @@ function LotTile({
   onToggleLiked: (lotId: number) => void;
   timeLabel: string;
 }) {
-  const imageUrl = getLotPrimaryImageUrl(lot);
+  const imageUrl = getResolvedLotPrimaryImageUrl(lot);
 
   return (
     <article className={`browse-lot-tile ${bidState.isOutbid ? "is-outbid" : ""} ${isSelected ? "is-selected" : ""}`}>
@@ -527,9 +599,10 @@ function SelectedLotPanel({
   phase: AuctionPhase;
   timeLabel: string;
 }) {
-  const imageUrls = getLotImageUrls(lot);
+  const imageUrls = getResolvedLotImageUrls(lot);
   const imageCount = Math.max(1, imageUrls.length);
-  const activeImageUrl = imageUrls[imageIndex] ?? null;
+  const activeImageIndex = imageUrls.length > 0 ? Math.min(imageIndex, imageUrls.length - 1) : 0;
+  const activeImageUrl = imageUrls[activeImageIndex] ?? null;
   const minimumBid = parseMoney(lot.current_price) + parseMoney(lot.bid_increment);
   const [bidAmount, setBidAmount] = useState(minimumBid);
   const buyNowPrice = getOptionalMoneyField(lot, ["buy_now_price", "buyNowPrice", "buy_now"]);
@@ -558,7 +631,7 @@ function SelectedLotPanel({
       <div className="browse-detail-media">
         <LotImage imageUrl={activeImageUrl} isOutbid={bidState.isOutbid} label={lot.title} />
         <span className="browse-image-counter">
-          {imageIndex + 1}/{imageCount}
+          {activeImageIndex + 1}/{imageCount}
         </span>
         {bidState.isOutbid ? <span className="browse-outbid-badge">Outbid</span> : null}
         {imageCount > 1 ? (
@@ -656,12 +729,16 @@ function LotImage({
   label: string;
 }) {
   return imageUrl ? (
-    <span
-      aria-label={label}
-      className={`browse-lot-image ${isOutbid ? "is-outbid" : ""}`}
-      role="img"
-      style={{ backgroundImage: `url("${imageUrl}")` }}
-    />
+    <span className={`browse-lot-image ${isOutbid ? "is-outbid" : ""}`}>
+      <Image
+        alt={label}
+        className="browse-lot-image-fill"
+        fill
+        sizes="(min-width: 1080px) 25vw, (min-width: 720px) 50vw, 100vw"
+        src={imageUrl}
+        unoptimized
+      />
+    </span>
   ) : (
     <span className={`browse-lot-image browse-lot-placeholder ${isOutbid ? "is-outbid" : ""}`} aria-hidden="true">
       <BadgeCheck size={26} aria-hidden="true" />
@@ -822,11 +899,79 @@ function deriveTargetAmount(lots: Lot[], totalRaised: number): number {
   return Math.ceil(base / 1000) * 1000;
 }
 
-function getLotImageUrls(lot: Lot): string[] {
-  const uploadedUrls = lot.uploaded_images?.map((image) => image.image_url).filter(Boolean) ?? [];
-  const legacyUrls = lot.images?.filter(Boolean) ?? [];
-  const primary = getLotPrimaryImageUrl(lot);
-  return Array.from(new Set([primary, ...uploadedUrls, ...legacyUrls].filter(Boolean) as string[]));
+function getResolvedLotPrimaryImageUrl(lot: Lot): string | null {
+  return getResolvedLotImageUrls(lot)[0] ?? null;
+}
+
+function getResolvedLotImageUrls(lot: Lot): string[] {
+  const apiImageUrls = getApiProvidedLotImageUrls(lot);
+  if (apiImageUrls.length > 0) return apiImageUrls;
+
+  return getStagingDemoFallbackLotImageUrls(lot);
+}
+
+function getApiProvidedLotImageUrls(lot: Lot): string[] {
+  const record = lot as unknown as Record<string, unknown>;
+  const urls: string[] = [];
+
+  for (const key of API_LOT_IMAGE_FIELD_KEYS) {
+    addImageUrlCandidate(record[key], urls);
+  }
+
+  for (const key of API_LOT_IMAGE_COLLECTION_KEYS) {
+    addImageCollectionUrls(record[key], urls);
+  }
+
+  return Array.from(new Set(urls));
+}
+
+function getStagingDemoFallbackLotImageUrls(lot: Lot): string[] {
+  const normalizedTitle = lot.title.toLowerCase();
+  const fallback = STAGING_DEMO_LOT_IMAGE_FALLBACKS.find(({ titleFragment }) => normalizedTitle.includes(titleFragment));
+  return fallback ? [...fallback.imageUrls] : [];
+}
+
+function addImageCollectionUrls(value: unknown, urls: string[]) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      addImageCollectionUrls(item, urls);
+    }
+    return;
+  }
+
+  if (!isRecord(value)) {
+    addImageUrlCandidate(value, urls);
+    return;
+  }
+
+  const initialUrlCount = urls.length;
+  for (const key of API_LOT_IMAGE_OBJECT_KEYS) {
+    addImageUrlCandidate(value[key], urls);
+  }
+  if (urls.length === initialUrlCount) {
+    addImageUrlCandidate(value.image, urls);
+  }
+}
+
+function addImageUrlCandidate(value: unknown, urls: string[]) {
+  const normalizedUrl = normalizeLotImageUrl(value);
+  if (normalizedUrl) {
+    urls.push(normalizedUrl);
+  }
+}
+
+function normalizeLotImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^(https?:|data:|\/)/i.test(trimmed)) return trimmed;
+
+  return `/${trimmed.replace(/^\.?\//, "")}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function getOptionalStringField(source: unknown, keys: string[]): string | null {
