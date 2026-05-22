@@ -376,6 +376,35 @@ def test_seeded_premium_demo_remains_visible_in_public_search():
     ]
 
 
+def test_public_browse_allows_generic_smoke_test_titles_created_by_e2e():
+    seller = create_user("seller", role=UserRole.SELLER)
+    smoke_auction = create_auction(
+        seller=seller,
+        title="Smoke Auction 1779475628423 Edited",
+        status=AuctionStatus.LIVE,
+    )
+    smoke_lot = create_lot(
+        auction=smoke_auction,
+        title="Smoke Lot 1779475628423 Edited",
+        status=LotStatus.OPEN,
+    )
+
+    client = APIClient()
+    auction_list_response = client.get("/api/auctions/", {"search": "Smoke Auction"})
+    auction_detail_response = client.get(f"/api/auctions/{smoke_auction.id}/")
+    lot_list_response = client.get("/api/lots/", {"auction": smoke_auction.id})
+    lot_detail_response = client.get(f"/api/lots/{smoke_lot.id}/")
+
+    assert auction_list_response.status_code == 200
+    assert [auction["id"] for auction in auction_list_response.data["results"]] == [smoke_auction.id]
+    assert auction_detail_response.status_code == 200
+    assert auction_detail_response.data["title"] == "Smoke Auction 1779475628423 Edited"
+    assert lot_list_response.status_code == 200
+    assert [lot["id"] for lot in lot_list_response.data["results"]] == [smoke_lot.id]
+    assert lot_detail_response.status_code == 200
+    assert lot_detail_response.data["title"] == "Smoke Lot 1779475628423 Edited"
+
+
 def test_admin_browsing_can_see_all_auctions_and_lots():
     seller = create_user("seller", role=UserRole.SELLER)
     other_seller = create_user("other_seller", role=UserRole.SELLER)
