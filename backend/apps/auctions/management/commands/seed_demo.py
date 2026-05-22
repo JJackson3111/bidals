@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
 from apps.auctions.models import Auction, AuctionStatus, Bid, Lot, LotStatus
+from apps.auctions.public_browse import public_browse_test_auction_query
 from apps.auctions.services.bidding import place_bid
 
 
@@ -45,6 +46,7 @@ class Command(BaseCommand):
             )
 
             self._clear_existing_demo_data(seller=seller)
+            archived_legacy_count = self._archive_legacy_public_test_auctions()
 
             now = timezone.now()
             live_auction = self._create_auction(
@@ -159,6 +161,7 @@ class Command(BaseCommand):
                 entity_id="phase5",
                 metadata={
                     "demo_seed": True,
+                    "archived_legacy_public_test_auctions": archived_legacy_count,
                     "message": "Premium demo data refreshed for the BIDALS browse experience.",
                     "seller_id": seller.id,
                 },
@@ -208,6 +211,17 @@ class Command(BaseCommand):
 
         AuditLog.objects.filter(audit_filter).delete()
         demo_auctions.delete()
+
+    def _archive_legacy_public_test_auctions(self):
+        legacy_auctions = Auction.objects.filter(public_browse_test_auction_query()).exclude(
+            status=AuctionStatus.CANCELLED
+        )
+        archived_count = legacy_auctions.update(status=AuctionStatus.CANCELLED)
+        if archived_count:
+            self.stdout.write(
+                self.style.WARNING(f"Archived {archived_count} legacy smoke/test auction(s).")
+            )
+        return archived_count
 
     def _create_auction(self, *, seller, title, description, start_time, end_time, status):
         auction = Auction.objects.create(

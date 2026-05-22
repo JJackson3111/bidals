@@ -261,6 +261,73 @@ def test_public_and_bidder_browsing_still_see_public_auctions_and_lots():
     assert bidder_detail_response.status_code == 200
 
 
+def test_public_browse_hides_legacy_smoke_data_and_orders_live_demo_first():
+    seller = create_user("seller", role=UserRole.SELLER)
+    smoke_seller = create_user("SellerTest", role=UserRole.SELLER)
+    demo_auction = create_auction(
+        seller=seller,
+        title="[Demo] BIDALS Premium Benefit Auction",
+        status=AuctionStatus.LIVE,
+    )
+    ended_public_auction = create_auction(
+        seller=seller,
+        title="Completed Community Gala",
+        status=AuctionStatus.ENDED,
+    )
+    phase17_auction = create_auction(
+        seller=smoke_seller,
+        title="PHASE17 SMOKE AUCTION 1777996033",
+        status=AuctionStatus.ENDED,
+    )
+    old_demo_auction = create_auction(
+        seller=smoke_seller,
+        title="BIDALS Demo Auction_1",
+        status=AuctionStatus.ENDED,
+    )
+    staging_auction = create_auction(
+        seller=smoke_seller,
+        title="[STAGING TEST AUCTION] Live Governance Sale",
+        status=AuctionStatus.LIVE,
+    )
+    demo_lot = create_lot(auction=demo_auction, title="[Demo] Starter Wine Cellar")
+    ended_public_lot = create_lot(
+        auction=ended_public_auction,
+        title="Supporter Showcase Lot",
+        status=LotStatus.CLOSED,
+    )
+    create_lot(auction=phase17_auction, title="PHASE17 SMOKE LOT 1777996033", status=LotStatus.SOLD)
+    create_lot(auction=old_demo_auction, title="Test Sweet", status=LotStatus.CLOSED)
+    create_lot(auction=staging_auction, title="[DEMO LOT] Staging Live Bid Device")
+
+    anonymous_client = APIClient()
+    auction_response = anonymous_client.get("/api/auctions/")
+    lot_response = anonymous_client.get("/api/lots/")
+
+    assert auction_response.status_code == 200
+    auction_titles = [auction["title"] for auction in auction_response.data["results"]]
+    assert auction_titles[0] == "[Demo] BIDALS Premium Benefit Auction"
+    assert auction_titles == [
+        "[Demo] BIDALS Premium Benefit Auction",
+        "Completed Community Gala",
+    ]
+
+    assert lot_response.status_code == 200
+    assert [lot["id"] for lot in lot_response.data["results"]] == [demo_lot.id, ended_public_lot.id]
+
+    seller_client = APIClient()
+    seller_client.force_authenticate(user=smoke_seller)
+    seller_response = seller_client.get("/api/auctions/", {"sort": "oldest"})
+
+    assert seller_response.status_code == 200
+    assert {
+        auction["title"] for auction in seller_response.data["results"]
+    } == {
+        "PHASE17 SMOKE AUCTION 1777996033",
+        "BIDALS Demo Auction_1",
+        "[STAGING TEST AUCTION] Live Governance Sale",
+    }
+
+
 def test_admin_browsing_can_see_all_auctions_and_lots():
     seller = create_user("seller", role=UserRole.SELLER)
     other_seller = create_user("other_seller", role=UserRole.SELLER)
