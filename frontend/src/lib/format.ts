@@ -35,6 +35,8 @@ export function getTimeRemaining(endTime: string): string {
 export function humanBidReason(reason: BidRejectionReason): string {
   const messages: Record<BidRejectionReason, string> = {
     AUCTION_NOT_LIVE: "This auction is not currently live.",
+    AUCTION_NOT_STARTED: "This auction has not started yet.",
+    AUCTION_ENDED: "This auction has ended.",
     LOT_CLOSED: "This lot is closed.",
     BID_TOO_LOW: "Your bid is too low.",
     INVALID_INCREMENT: "Your bid does not match the required increment.",

@@ -10,6 +10,8 @@ import { ErrorState, LoadingState } from "@/components/StateViews";
 import { api, ApiError } from "@/lib/api";
 import type { AuctionStatus } from "@/lib/types";
 
+const LIVE_START_TIME_LOCKED_ERROR = "Live auction start time cannot be changed.";
+
 function toDateTimeLocal(value: string): string {
   const date = new Date(value);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -28,6 +30,23 @@ function loadErrorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Unable to load auction.";
 }
 
+function errorValueIncludes(value: unknown, expectedMessage: string): boolean {
+  if (typeof value === "string") return value === expectedMessage;
+  if (Array.isArray(value)) return value.some((item) => errorValueIncludes(item, expectedMessage));
+  if (value && typeof value === "object") {
+    return Object.values(value).some((item) => errorValueIncludes(item, expectedMessage));
+  }
+  return false;
+}
+
+function isLiveStartTimeLockedError(error: unknown): error is ApiError {
+  return error instanceof ApiError && errorValueIncludes(error.body.start_time, LIVE_START_TIME_LOCKED_ERROR);
+}
+
+function isAuctionStatus(value: unknown): value is AuctionStatus {
+  return ["draft", "scheduled", "live", "ended", "cancelled"].includes(String(value));
+}
+
 export default function EditAuctionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -39,21 +58,28 @@ export default function EditAuctionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveTimingNotice, setLiveTimingNotice] = useState(false);
+  const [isStartTimeLocked, setIsStartTimeLocked] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       setError(null);
+      setLiveTimingNotice(false);
       try {
         const auction = await api.getManageAuction(params.id);
+        const effectiveStatusValue = (auction as { effective_status?: unknown }).effective_status;
+        const effectiveStatus = isAuctionStatus(effectiveStatusValue) ? effectiveStatusValue : auction.status;
         setTitle(auction.title);
         setDescription(auction.description);
         setStartTime(toDateTimeLocal(auction.start_time));
         setEndTime(toDateTimeLocal(auction.end_time));
         setAuctionStatus(auction.status);
+        setIsStartTimeLocked(effectiveStatus === "live");
       } catch (err) {
         setError(loadErrorMessage(err));
+        setIsStartTimeLocked(false);
       } finally {
         setIsLoading(false);
       }
@@ -65,6 +91,7 @@ export default function EditAuctionPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setLiveTimingNotice(false);
     setSuccess(null);
     setIsSubmitting(true);
 
@@ -72,14 +99,18 @@ export default function EditAuctionPage() {
       const auction = await api.updateAuction(params.id, {
         title,
         description,
-        start_time: toIsoDateTime(startTime),
+        ...(isStartTimeLocked ? {} : { start_time: toIsoDateTime(startTime) }),
         end_time: toIsoDateTime(endTime),
         status: auctionStatus,
       });
       setSuccess("Auction saved.");
       router.push(`/auctions/${auction.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to save auction.");
+      if (isLiveStartTimeLockedError(err)) {
+        setLiveTimingNotice(true);
+      } else {
+        setError(err instanceof ApiError ? err.message : "Unable to save auction.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -103,8 +134,17 @@ export default function EditAuctionPage() {
               </div>
               <div className="form-field">
                 <label htmlFor="start-time">Start time</label>
-                <span className="form-help">Server time remains the authority for live bidding.</span>
-                <input id="start-time" required type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                <span className="form-help">
+                  {isStartTimeLocked ? "Start time is locked once bidding is live." : "Server time remains the authority for live bidding."}
+                </span>
+                <input
+                  id="start-time"
+                  required
+                  disabled={isStartTimeLocked}
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(event) => setStartTime(event.target.value)}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="end-time">End time</label>
@@ -123,6 +163,13 @@ export default function EditAuctionPage() {
               </div>
             </div>
             {success ? <div className="form-success" role="status">{success}</div> : null}
+            {liveTimingNotice ? (
+              <div className="form-error" role="alert">
+                Auction timing is locked once bidding is live.
+                <br />
+                You can still edit permitted lot details.
+              </div>
+            ) : null}
             {error ? <div className="form-error" role="alert">{error}</div> : null}
             <button className="primary-button" disabled={isSubmitting} type="submit">
               <Save size={18} aria-hidden="true" />

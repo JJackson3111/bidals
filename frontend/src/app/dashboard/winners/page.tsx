@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, RefreshCw, Trophy } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -20,7 +20,7 @@ export default function WinnersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -34,12 +34,11 @@ export default function WinnersPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [outcomeStatus]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outcomeStatus]);
+    void load();
+  }, [load]);
 
   const groupedByAuction = useMemo(() => {
     const groups = new Map<number, NonNullable<WinnerReviewResponse["results"]>>();
