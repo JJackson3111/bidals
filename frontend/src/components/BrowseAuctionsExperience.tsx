@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   Camera,
   Clock,
+  Eye,
   Gift,
   Heart,
   Minus,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   Ticket,
   Trophy,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -100,6 +102,11 @@ const STAGING_DEMO_LOT_IMAGE_FALLBACKS = [
     ],
   },
 ] as const;
+const STAGING_DEMO_LOT_METADATA_FALLBACKS = [
+  { titleFragment: "starter", bidderCount: 14, bidsLastHour: 4, watcherCount: 41 },
+  { titleFragment: "reserve", bidderCount: 11, bidsLastHour: 3, watcherCount: 36 },
+  { titleFragment: "increment", bidderCount: 18, bidsLastHour: 5, watcherCount: 53 },
+] as const;
 
 type LotBidState = {
   acceptedBids: Bid[];
@@ -109,6 +116,13 @@ type LotBidState = {
   isOutbid: boolean;
   userBidCount: number;
   watcherCount: number;
+};
+
+type LotLiveMetadata = {
+  bidderCount: number | null;
+  bidsLastHour: number | null;
+  reserveMet: boolean;
+  watcherCount: number | null;
 };
 
 type EventHub = {
@@ -553,6 +567,7 @@ function LotTile({
   timeLabel: string;
 }) {
   const imageUrl = getResolvedLotPrimaryImageUrl(lot);
+  const liveMetadata = getLotLiveMetadata(lot, bidState);
 
   return (
     <article className={`browse-lot-tile ${bidState.isOutbid ? "is-outbid" : ""} ${isSelected ? "is-selected" : ""}`}>
@@ -568,7 +583,8 @@ function LotTile({
         </span>
         <div className="browse-lot-tile-body">
           <h3>{lot.title}</h3>
-          <div>
+          <LotTileLiveMetadata metadata={liveMetadata} />
+          <div className="browse-lot-tile-footer">
             <strong>{formatWholeMoney(lot.current_price)}</strong>
             <span>
               <Clock size={12} aria-hidden="true" />
@@ -587,6 +603,62 @@ function LotTile({
         <Heart size={16} aria-hidden="true" />
       </button>
     </article>
+  );
+}
+
+function LotTileLiveMetadata({ metadata }: { metadata: LotLiveMetadata }) {
+  const bidderCount = metadata.bidderCount;
+  const watcherCount = metadata.watcherCount;
+  const bidsLastHour = metadata.bidsLastHour;
+  const hasBidders = bidderCount !== null;
+  const hasWatchers = watcherCount !== null;
+  const hasAudience = hasBidders || hasWatchers;
+  const hasActivity = bidsLastHour !== null && bidsLastHour > 0;
+  if (!hasAudience && !metadata.reserveMet && !hasActivity) return null;
+
+  return (
+    <div className="browse-lot-live-meta">
+      <div className="browse-lot-meta-line browse-lot-meta-desktop">
+        {hasBidders ? (
+          <span className="browse-lot-meta-item">
+            <Users size={12} aria-hidden="true" />
+            {formatCountLabel(bidderCount, "bidder", "bidders")}
+          </span>
+        ) : null}
+        {hasBidders && hasWatchers ? <span className="browse-lot-meta-dot" aria-hidden="true">·</span> : null}
+        {hasWatchers ? (
+          <span className="browse-lot-meta-item">
+            <Eye size={12} aria-hidden="true" />
+            {formatCountLabel(watcherCount, "watching", "watching")}
+          </span>
+        ) : null}
+        {(hasAudience && metadata.reserveMet) ? <span className="browse-lot-meta-dot" aria-hidden="true">·</span> : null}
+        {metadata.reserveMet ? <span className="browse-lot-meta-reserve">Reserve met</span> : null}
+      </div>
+
+      {hasActivity ? (
+        <div className="browse-lot-meta-activity browse-lot-meta-desktop">
+          {formatCountLabel(bidsLastHour, "bid", "bids")} in last hour
+        </div>
+      ) : null}
+
+      <div className="browse-lot-meta-line browse-lot-meta-mobile">
+        {hasBidders ? (
+          <span className="browse-lot-meta-item">
+            <Users size={11} aria-hidden="true" />
+            {formatCountLabel(bidderCount, "bidder", "bidders")}
+          </span>
+        ) : null}
+        {hasBidders && hasWatchers ? <span className="browse-lot-meta-dot" aria-hidden="true">·</span> : null}
+        {hasWatchers ? (
+          <span className="browse-lot-meta-item">
+            <Eye size={11} aria-hidden="true" />
+            {formatCountLabel(watcherCount, "watching", "watching")}
+          </span>
+        ) : null}
+        {metadata.reserveMet ? <span className="browse-lot-meta-reserve">Reserve met</span> : null}
+      </div>
+    </div>
   );
 }
 
@@ -914,6 +986,56 @@ function getLotBidStatus(lot: Lot, bids: Bid[], userId: number | null): LotBidSt
   };
 }
 
+function getLotLiveMetadata(lot: Lot, bidState: LotBidState): LotLiveMetadata {
+  const demoMetadata = getStagingDemoLotMetadataFallback(lot);
+  const bidderCount = getOptionalCountField(lot, ["bidder_count", "bidderCount", "bidders", "bidder_total", "bidderTotal"])
+    ?? (bidState.bidderCount > 0 ? bidState.bidderCount : null)
+    ?? demoMetadata?.bidderCount
+    ?? null;
+  const watcherCount = getOptionalCountField(lot, ["watchers", "watcher_count", "watcherCount", "watching_count", "watchingCount"])
+    ?? demoMetadata?.watcherCount
+    ?? null;
+  const bidsLastHour = getOptionalCountField(lot, ["bids_last_hour", "bidsLastHour", "recent_bid_count", "recentBidCount"])
+    ?? getAcceptedBidCountInLastHour(bidState.acceptedBids)
+    ?? demoMetadata?.bidsLastHour
+    ?? null;
+
+  return {
+    bidderCount: bidderCount !== null && bidderCount > 0 ? bidderCount : null,
+    bidsLastHour: bidsLastHour !== null && bidsLastHour > 0 ? bidsLastHour : null,
+    reserveMet: getLotReserveMet(lot) === true,
+    watcherCount: watcherCount !== null && watcherCount > 0 ? watcherCount : null,
+  };
+}
+
+function getAcceptedBidCountInLastHour(acceptedBids: Bid[]): number | null {
+  const now = Date.now();
+  const recentBidCount = acceptedBids.filter((bid) => {
+    const bidMs = new Date(bid.server_timestamp).getTime();
+    return Number.isFinite(bidMs) && now - bidMs <= ONE_HOUR_MS;
+  }).length;
+
+  return recentBidCount > 0 ? recentBidCount : null;
+}
+
+function getLotReserveMet(lot: Lot): boolean | null {
+  const providedReserveMet = getOptionalBooleanField(lot, ["reserve_met", "reserveMet"]);
+  if (providedReserveMet !== null) return providedReserveMet;
+
+  const reservePrice = getOptionalFiniteNumberField(lot, ["reserve_price", "reservePrice"]);
+  if (reservePrice === null || reservePrice <= 0) return null;
+
+  const currentPrice = getOptionalFiniteNumberField(lot, ["current_price", "currentPrice"]);
+  if (currentPrice === null) return null;
+
+  return currentPrice >= reservePrice;
+}
+
+function getStagingDemoLotMetadataFallback(lot: Lot): (typeof STAGING_DEMO_LOT_METADATA_FALLBACKS)[number] | null {
+  const normalizedTitle = lot.title.toLowerCase();
+  return STAGING_DEMO_LOT_METADATA_FALLBACKS.find(({ titleFragment }) => normalizedTitle.includes(titleFragment)) ?? null;
+}
+
 function getHighestAcceptedBid(acceptedBids: Bid[]): Bid | null {
   return [...acceptedBids].sort(compareBidsByRank)[0] ?? null;
 }
@@ -1064,6 +1186,37 @@ function getOptionalStringField(source: unknown, keys: string[]): string | null 
   return null;
 }
 
+function getOptionalCountField(source: unknown, keys: string[]): number | null {
+  const value = getOptionalFiniteNumberField(source, keys);
+  return value !== null ? Math.max(0, Math.floor(value)) : null;
+}
+
+function getOptionalBooleanField(source: unknown, keys: string[]): boolean | null {
+  const record = source as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true") return true;
+      if (normalized === "false") return false;
+    }
+  }
+  return null;
+}
+
+function getOptionalFiniteNumberField(source: unknown, keys: string[]): number | null {
+  const record = source as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value !== "number" && typeof value !== "string") continue;
+
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function getOptionalMoneyField(source: unknown, keys: string[]): number | null {
   const record = source as Record<string, unknown>;
   for (const key of keys) {
@@ -1074,6 +1227,11 @@ function getOptionalMoneyField(source: unknown, keys: string[]): number | null {
     }
   }
   return null;
+}
+
+function formatCountLabel(count: number, singular: string, plural: string): string {
+  const label = count === 1 ? singular : plural;
+  return `${new Intl.NumberFormat("en-US").format(count)} ${label}`;
 }
 
 function readLikedLots(auctionId: number): number[] {
