@@ -15,6 +15,8 @@ export type FulfillmentStatus =
 
 export type BidRejectionReason =
   | "AUCTION_NOT_LIVE"
+  | "AUCTION_NOT_STARTED"
+  | "AUCTION_ENDED"
   | "LOT_CLOSED"
   | "BID_TOO_LOW"
   | "INVALID_INCREMENT"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivitySquare, AlertTriangle, Bell, Clock3, Download, FileClock, RefreshCw, ShieldCheck, Trophy } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -24,7 +24,7 @@ export default function OperationsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -34,12 +34,11 @@ export default function OperationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [windowMinutes]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowMinutes]);
+    void load();
+  }, [load]);
 
   async function handleExport() {
     setIsExporting(true);
