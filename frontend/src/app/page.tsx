@@ -3,8 +3,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
-  BarChart3,
-  Bell,
   CalendarPlus,
   CheckCircle2,
   ChevronLeft,
@@ -14,7 +12,6 @@ import {
   Eye,
   Gavel,
   ImagePlus,
-  Package,
   RadioTower,
   Shield,
   TrendingUp,
@@ -22,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { LandingLiveAnalytics } from "@/components/LandingLiveAnalytics";
 
 const trustFeatures = [
   {
@@ -190,13 +188,6 @@ const liveLots = [
     image: "/demo-lots/designer-furniture.jpg",
     variant: "furniture",
   },
-];
-
-const activityItems = [
-  { icon: TrendingUp, text: "New bid on Vintage Camera", time: "2m ago" },
-  { icon: Users, text: "New bidder registered", time: "5m ago" },
-  { icon: TrendingUp, text: "Bid increased on Watch Set", time: "8m ago" },
-  { icon: Package, text: "New lot added to auction", time: "12m ago" },
 ];
 
 function MediaPanel({ count, image, label, variant }: { count: string; image: string; label: string; variant: string }) {
@@ -430,73 +421,12 @@ export default function LandingPage() {
       </section>
 
       <section className="landing-section landing-section-muted">
-        <div className="landing-container">
-          <div className="landing-section-heading">
+        <div className="landing-container seller-preview-container">
+          <div className="landing-section-heading seller-preview-heading">
             <h2>Manage with clarity</h2>
             <p>Everything sellers and admins need to monitor auction health without extra noise.</p>
           </div>
-          <div className="seller-preview-grid">
-            <article className="seller-preview-panel">
-              <div className="seller-preview-title">
-                <div className="landing-icon-box compact">
-                  <BarChart3 size={20} aria-hidden="true" />
-                </div>
-                <h3>Live analytics</h3>
-              </div>
-              <div className="auction-progress-module" aria-label="Auction progress">
-                <div className="auction-progress-header">
-                  <div>
-                    <span>Auction progress</span>
-                    <strong>£10,525 raised</strong>
-                  </div>
-                  <small>51% of £20,000 goal</small>
-                </div>
-                <div className="auction-progress-track" aria-hidden="true">
-                  <span className="auction-progress-fill" />
-                </div>
-                <div className="latest-sale-badge">+£500 latest sale</div>
-              </div>
-              <div className="seller-metric-list">
-                <div>
-                  <span>Total bids</span>
-                  <strong>1,247</strong>
-                </div>
-                <div>
-                  <span>Active bidders</span>
-                  <strong>89</strong>
-                </div>
-                <div>
-                  <span>Total value</span>
-                  <strong>$124,580</strong>
-                </div>
-              </div>
-            </article>
-
-            <article className="seller-preview-panel">
-              <div className="seller-preview-title">
-                <div className="landing-icon-box compact">
-                  <Bell size={20} aria-hidden="true" />
-                </div>
-                <h3>Live activity</h3>
-              </div>
-              <div className="activity-list">
-                {activityItems.map((activity) => {
-                  const Icon = activity.icon;
-                  return (
-                    <div className="activity-row" key={`${activity.text}-${activity.time}`}>
-                      <div className="activity-icon">
-                        <Icon size={16} aria-hidden="true" />
-                      </div>
-                      <div>
-                        <span>{activity.text}</span>
-                        <small>{activity.time}</small>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          </div>
+          <LandingLiveAnalytics />
         </div>
       </section>
 
