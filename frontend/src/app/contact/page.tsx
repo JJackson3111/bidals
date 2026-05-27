@@ -1,18 +1,26 @@
 import type { Metadata } from "next";
+import { Headphones, MailQuestion, ShieldCheck } from "lucide-react";
 
 import { MarketingFooter, MarketingSection, PageHeader } from "@/components/marketing/MarketingBlocks";
 import { MarketingLeadForm } from "@/components/marketing/MarketingLeadForm";
 
 export const metadata: Metadata = {
   title: "Contact | BIDALS",
-  description: "Contact BIDALS about digital fundraising, auctions, raffles, donations and platform partnerships.",
+  description:
+    "Contact BIDALS about auctions, raffles, donations, secure fundraising operations, white-label needs and platform partnerships.",
 };
 
 const contactReasons = [
-  "Questions about a fundraising campaign",
-  "Organisation or partner enquiries",
-  "Security and governance discussions",
-  "Future domain, Render or launch coordination",
+  "Campaign, demo and pricing conversations",
+  "Support questions for fundraising operations",
+  "Security, governance and data ownership discussions",
+  "White-label, partner and event operator enquiries",
+];
+
+const supportDetails = [
+  "Use the contact form while a safe inbox or backend workflow is connected.",
+  "Include your organisation, event timeline and fundraising formats where possible.",
+  "Do not share payment card data, passwords or sensitive supporter information in this frontend-only form.",
 ];
 
 export default function ContactPage() {
@@ -21,21 +29,44 @@ export default function ContactPage() {
       <PageHeader
         eyebrow="Contact"
         title="Talk to BIDALS about secure digital fundraising."
-        description="Use this frontend-only contact page for now. A backend or email workflow can be connected once the safe endpoint is agreed."
+        description="Share the context for your campaign, support need or partnership conversation. The current form is frontend-only until a safe backend or email workflow is connected."
       />
 
       <MarketingSection
         eyebrow="Enquiry"
-        title="Send a message"
-        description="Share the context for your campaign, organisation or partnership conversation."
+        title="A clean route into the BIDALS team"
+        description="Keep the message focused on your event model, operational needs and the part of the platform you want to discuss."
       >
         <div className="marketing-form-layout">
-          <MarketingLeadForm kind="contact" />
-          <aside className="marketing-side-panel" aria-label="Contact reasons">
-            <h3>Good reasons to get in touch</h3>
+          <div className="marketing-form-card">
+            <span className="marketing-inline-icon">
+              <MailQuestion size={19} aria-hidden="true" />
+              Frontend-only contact
+            </span>
+            <MarketingLeadForm kind="contact" />
+            <p className="marketing-form-note">
+              This form currently stores no message and sends no email. The TODO remains future backend or email integration.
+            </p>
+          </div>
+          <aside className="marketing-side-panel" aria-label="Support and contact details">
+            <span className="marketing-inline-icon">
+              <Headphones size={19} aria-hidden="true" />
+              Support details
+            </span>
+            <h3>What to include</h3>
             <ul>
               {contactReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+            <div className="marketing-side-divider" />
+            <span className="marketing-inline-icon">
+              <ShieldCheck size={19} aria-hidden="true" />
+              Safe handling
+            </span>
+            <ul>
+              {supportDetails.map((detail) => (
+                <li key={detail}>{detail}</li>
               ))}
             </ul>
           </aside>
