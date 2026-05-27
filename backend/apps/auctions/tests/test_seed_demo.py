@@ -4,9 +4,11 @@ from io import StringIO
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.utils import timezone
 
 from apps.accounts.models import UserRole
+from apps.auctions.management.commands.seed_demo import NON_LOCAL_DEMO_CONFIRMATION
 from apps.auctions.models import Auction, AuctionStatus, Bid, BidStatus, Lot, LotStatus
 
 pytestmark = pytest.mark.django_db
@@ -108,3 +110,44 @@ def test_seed_demo_archives_legacy_public_smoke_and_test_auctions():
     assert phase17_auction.status == AuctionStatus.CANCELLED
     assert old_demo_auction.status == AuctionStatus.CANCELLED
     assert public_auction.status == AuctionStatus.ENDED
+
+
+def test_seed_demo_refuses_staging_without_explicit_confirmation(monkeypatch):
+    monkeypatch.setenv("BIDALS_ENV", "staging")
+
+    with pytest.raises(CommandError, match="Refusing to run seed_demo in non-local environment"):
+        call_command("seed_demo", stdout=StringIO())
+
+    assert not User.objects.filter(email="admin@bidals.demo").exists()
+    assert Auction.objects.filter(title__startswith="[Demo]").count() == 0
+
+
+def test_seed_demo_allows_confirmed_non_local_demo_environment(monkeypatch):
+    monkeypatch.setenv("BIDALS_ENV", "staging")
+    output = StringIO()
+
+    call_command(
+        "seed_demo",
+        allow_non_local=True,
+        confirm_known_demo_credentials=NON_LOCAL_DEMO_CONFIRMATION,
+        stdout=output,
+    )
+
+    rendered = output.getvalue()
+    assert "Seeding demo data for environment: staging" in rendered
+    assert User.objects.filter(email="admin@bidals.demo").exists()
+    assert Auction.objects.filter(title="[Demo] BIDALS Premium Benefit Auction").exists()
+
+
+def test_seed_demo_refuses_production_even_with_confirmation(monkeypatch):
+    monkeypatch.setenv("BIDALS_ENV", "production")
+
+    with pytest.raises(CommandError, match="Refusing to run seed_demo in production"):
+        call_command(
+            "seed_demo",
+            allow_non_local=True,
+            confirm_known_demo_credentials=NON_LOCAL_DEMO_CONFIRMATION,
+            stdout=StringIO(),
+        )
+
+    assert not User.objects.filter(email="admin@bidals.demo").exists()

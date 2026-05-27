@@ -6,7 +6,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from bidals.storage import build_s3_storage_options
 from bidals.settings.origins import configured_origins
-from bidals.settings.validation import validate_rate_limit_settings
+from bidals.settings.validation import validate_rate_limit_cache_failure_mode, validate_rate_limit_settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ROOT_DIR = BASE_DIR.parent
@@ -232,6 +232,9 @@ BID_RATE_LIMIT_AUTHENTICATED_ATTEMPTS = env.int("BID_RATE_LIMIT_AUTHENTICATED_AT
 BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS = env.int("BID_RATE_LIMIT_ANONYMOUS_ATTEMPTS", default=2)
 BID_RATE_LIMIT_WINDOW_SECONDS = env.int("BID_RATE_LIMIT_WINDOW_SECONDS", default=60)
 ENABLE_RATE_LIMITING = env.bool("ENABLE_RATE_LIMITING", default=True)
+RATE_LIMIT_CACHE_FAILURE_MODE = validate_rate_limit_cache_failure_mode(
+    env("RATE_LIMIT_CACHE_FAILURE_MODE", default="deny")
+)
 RATE_LIMIT_LOGIN = env("RATE_LIMIT_LOGIN", default="5/minute")
 RATE_LIMIT_REGISTRATION = env("RATE_LIMIT_REGISTRATION", default="5/minute")
 RATE_LIMIT_BID_CREATE = env("RATE_LIMIT_BID_CREATE", default="")

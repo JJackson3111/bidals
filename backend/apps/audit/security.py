@@ -132,22 +132,41 @@ def check_security_rate_limit(
     try:
         count = _increment_key(key, timeout=window_seconds + 5)
     except Exception as exc:
+        allow_request = rate_limit_cache_failure_allows_requests()
         logger.warning(
-            "Security rate-limit cache unavailable; allowing request",
+            "Security rate-limit cache unavailable; %s request",
+            "allowing" if allow_request else "denying",
             extra={
                 "event": "security_rate_limit_cache_unavailable",
                 "scope": scope,
                 "setting_name": setting_name,
                 "error_type": type(exc).__name__,
+                "failure_mode": getattr(settings, "RATE_LIMIT_CACHE_FAILURE_MODE", "deny"),
             },
         )
+        if not allow_request:
+            audit_security_event(
+                request=request,
+                actor=actor,
+                action=AuditAction.RATE_LIMIT_TRIGGERED,
+                entity_type="rate_limit",
+                entity_id=scope,
+                metadata={
+                    "scope": scope,
+                    "limit": limit,
+                    "window_seconds": window_seconds,
+                    "retry_after": window_seconds,
+                    "cache_available": False,
+                    "failure_mode": getattr(settings, "RATE_LIMIT_CACHE_FAILURE_MODE", "deny"),
+                },
+            )
         return RateLimitCheck(
-            allowed=True,
+            allowed=allow_request,
             scope=scope,
             limit=limit,
             window_seconds=window_seconds,
-            retry_after=0,
-            remaining=limit,
+            retry_after=0 if allow_request else window_seconds,
+            remaining=limit if allow_request else 0,
             cache_available=False,
         )
 
@@ -221,6 +240,10 @@ def client_ip(request) -> str:
 
 def parse_rate(value: str | int) -> tuple[int, int]:
     return parse_rate_limit(value)
+
+
+def rate_limit_cache_failure_allows_requests() -> bool:
+    return str(getattr(settings, "RATE_LIMIT_CACHE_FAILURE_MODE", "deny")).lower() == "allow"
 
 
 def _increment_key(key: str, *, timeout: int) -> int:

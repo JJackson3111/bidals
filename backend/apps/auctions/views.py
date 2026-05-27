@@ -798,6 +798,7 @@ class LotViewSet(viewsets.ModelViewSet):
                     "rate_limit_scope": rate_limit.scope,
                     "rate_limit": rate_limit.limit,
                     "retry_after": rate_limit.retry_after,
+                    "rate_limit_cache_available": rate_limit.cache_available,
                     **request_context,
                 },
             )
@@ -813,6 +814,7 @@ class LotViewSet(viewsets.ModelViewSet):
                     "scope": "bid_create",
                     "limit": rate_limit.limit,
                     "retry_after": rate_limit.retry_after,
+                    "cache_available": rate_limit.cache_available,
                 },
             )
             logger.warning(
@@ -828,6 +830,7 @@ class LotViewSet(viewsets.ModelViewSet):
                     "scope": rate_limit.scope,
                     "limit": rate_limit.limit,
                     "retry_after": rate_limit.retry_after,
+                    "rate_limit_cache_available": rate_limit.cache_available,
                     "server_timestamp": server_timestamp.isoformat(),
                 },
             )

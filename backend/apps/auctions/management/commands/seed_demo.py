@@ -1,26 +1,50 @@
 from datetime import timedelta
 from decimal import Decimal
+import os
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
+from apps.audit.services.readiness import runtime_environment
 from apps.auctions.models import Auction, AuctionStatus, Bid, Lot, LotStatus
 from apps.auctions.public_browse import public_browse_test_auction_query
 from apps.auctions.services.bidding import place_bid
 
 
 DEMO_PASSWORD = "ChangeMe123!"
+LOCAL_DEMO_SEED_ENVIRONMENTS = {"ci", "dev", "development", "local", "localhost", "test", "testing"}
+PRODUCTION_DEMO_SEED_ENVIRONMENTS = {"prod", "production"}
+NON_LOCAL_DEMO_CONFIRMATION = "I understand seed_demo creates known demo credentials"
 
 
 class Command(BaseCommand):
     help = "Seed BIDALS with demo users, auctions, lots, bids, and audit activity."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--allow-non-local",
+            action="store_true",
+            help="Allow seed_demo outside local/dev/CI environments when paired with the confirmation phrase.",
+        )
+        parser.add_argument(
+            "--confirm-known-demo-credentials",
+            default="",
+            help=(
+                "Required with --allow-non-local. Must equal: "
+                f"{NON_LOCAL_DEMO_CONFIRMATION!r}."
+            ),
+        )
+
     def handle(self, *args, **options):
+        environment = self._assert_demo_seed_allowed(options)
+        self.stdout.write(f"Seeding demo data for environment: {environment}")
+
         with transaction.atomic():
             admin = self._upsert_user(
                 username="demo_admin",
@@ -171,6 +195,33 @@ class Command(BaseCommand):
         self.stdout.write("Admin:  admin@bidals.demo / ChangeMe123!")
         self.stdout.write("Seller: seller@bidals.demo / ChangeMe123!")
         self.stdout.write("Bidder: bidder@bidals.demo / ChangeMe123!")
+
+    def _assert_demo_seed_allowed(self, options):
+        environment = runtime_environment()
+        settings_module = getattr(settings, "SETTINGS_MODULE", "") or os.getenv("DJANGO_SETTINGS_MODULE", "")
+        is_production_settings_module = settings_module.endswith(".prod")
+        is_local_environment = environment in LOCAL_DEMO_SEED_ENVIRONMENTS and not is_production_settings_module
+        if is_local_environment:
+            return environment
+
+        if environment in PRODUCTION_DEMO_SEED_ENVIRONMENTS:
+            raise CommandError(
+                "Refusing to run seed_demo in production. "
+                "This command creates known demo credentials and refreshes demo auction data. "
+                "Use audited production data repair or staging-only seed workflows instead."
+            )
+
+        confirmed = options["confirm_known_demo_credentials"] == NON_LOCAL_DEMO_CONFIRMATION
+        if not (options["allow_non_local"] and confirmed):
+            raise CommandError(
+                f"Refusing to run seed_demo in non-local environment {environment!r}. "
+                "This command creates known demo credentials and refreshes demo auction data. "
+                "For an isolated demo/staging environment only, rerun with "
+                "--allow-non-local and "
+                f"--confirm-known-demo-credentials={NON_LOCAL_DEMO_CONFIRMATION!r}."
+            )
+
+        return environment
 
     def _upsert_user(self, *, username, email, role, is_staff=False, is_superuser=False):
         User = get_user_model()

@@ -1,7 +1,7 @@
 from .base import *  # noqa: F403
 from .base import REDIS_CACHE_KEY_PREFIX, REDIS_CACHE_OPTIONS, REDIS_URL, env
 from .origins import configured_origins, merge_origins
-from .validation import assert_required_production_env
+from .validation import assert_required_production_env, validate_rate_limit_cache_failure_mode
 from django.core.exceptions import ImproperlyConfigured
 
 assert_required_production_env()
@@ -53,6 +53,9 @@ CSRF_COOKIE_SAMESITE = env("DJANGO_CSRF_COOKIE_SAMESITE", default="Lax")
 SECURE_REFERRER_POLICY = env("DJANGO_REFERRER_POLICY", default="same-origin")
 
 USE_REDIS_CACHE = env.bool("USE_REDIS_CACHE", default=True)
+RATE_LIMIT_CACHE_FAILURE_MODE = validate_rate_limit_cache_failure_mode(
+    env("RATE_LIMIT_CACHE_FAILURE_MODE", default="deny")
+)
 if USE_REDIS_CACHE:
     CACHES = {
         "default": {

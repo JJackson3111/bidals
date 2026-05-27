@@ -13,8 +13,9 @@ Use this after deploys, security-sensitive changes, or suspicious activity.
 4. Confirm `DJANGO_CORS_ALLOWED_ORIGINS` or `CORS_ALLOWED_ORIGINS` contains only deployed frontend origins.
 5. Confirm `DJANGO_CSRF_TRUSTED_ORIGINS` or `CSRF_TRUSTED_ORIGINS` contains only trusted HTTPS origins.
 6. Confirm `USE_REDIS_CACHE=True` and Redis passes `deployment_check --production`.
-7. Confirm `USE_S3=True` for production media storage.
-8. Confirm `/api/health/` returns `{"status":"ok"}`.
+7. Confirm `RATE_LIMIT_CACHE_FAILURE_MODE=deny` in staging and production so bid-sensitive and admin-sensitive endpoints fail closed if cache-backed throttling is unavailable.
+8. Confirm `USE_S3=True` for production media storage.
+9. Confirm `/api/health/` returns `{"status":"ok"}`.
 
 ## Confirm Rate Limiting
 
@@ -34,6 +35,12 @@ Bidding:
 5. Confirm the lot price only changed after the accepted bid.
 
 Reset staging limits after testing.
+
+Cache outage behavior:
+
+1. Confirm local development uses `RATE_LIMIT_CACHE_FAILURE_MODE=allow` only for developer convenience.
+2. Confirm staging and production use `RATE_LIMIT_CACHE_FAILURE_MODE=deny`.
+3. If Redis/cache is unavailable in staging or production, bid-sensitive and admin-sensitive endpoints should return HTTP `429` instead of silently bypassing throttling.
 
 ## Review Audit Logs
 
@@ -88,4 +95,4 @@ Run locally when needed:
 python scripts/security_secrets_check.py
 ```
 
-CI also runs advisory dependency audits. Treat high-confidence critical findings as release blockers.
+CI runs blocking dependency audits for production Python requirements and high/critical frontend npm findings. Treat confirmed high-confidence dependency findings as release blockers.

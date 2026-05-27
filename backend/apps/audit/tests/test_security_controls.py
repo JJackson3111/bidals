@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -10,7 +11,11 @@ from rest_framework.test import APIClient
 from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
 from bidals.settings.origins import comma_separated_urls, configured_origins, merge_origins
-from bidals.settings.validation import missing_required_production_env, validate_rate_limit_settings
+from bidals.settings.validation import (
+    missing_required_production_env,
+    validate_rate_limit_cache_failure_mode,
+    validate_rate_limit_settings,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -167,6 +172,11 @@ def test_blank_bid_create_rate_limit_is_valid_for_bid_specific_fallback():
     )
 
 
+def test_invalid_rate_limit_cache_failure_mode_fails_validation():
+    with pytest.raises(ImproperlyConfigured, match="RATE_LIMIT_CACHE_FAILURE_MODE"):
+        validate_rate_limit_cache_failure_mode("maybe")
+
+
 def test_permission_denied_is_audited_for_admin_only_endpoint():
     seller = create_user("seller", role=UserRole.SELLER)
 
@@ -196,6 +206,26 @@ def test_sensitive_admin_actions_are_rate_limited_and_audited():
         action=AuditAction.RATE_LIMIT_TRIGGERED,
         actor=admin,
         entity_id="admin_activity_export",
+    ).exists()
+
+
+@override_settings(RATE_LIMIT_ADMIN_ACTIONS="10/minute", RATE_LIMIT_CACHE_FAILURE_MODE="deny")
+def test_sensitive_admin_actions_fail_closed_when_rate_limit_cache_is_unavailable():
+    admin = create_user("cache_admin", role=UserRole.ADMIN)
+    client = authenticated_client(admin)
+
+    with patch("apps.audit.security.cache.add", side_effect=ConnectionError("redis unavailable")):
+        response = client.get("/api/admin/activity/export/")
+
+    assert response.status_code == 429
+    assert response.data["reason"] == "RATE_LIMITED"
+    assert response.data["retry_after"] == 60
+    assert AuditLog.objects.filter(
+        action=AuditAction.RATE_LIMIT_TRIGGERED,
+        actor=admin,
+        entity_id="admin_activity_export",
+        metadata__cache_available=False,
+        metadata__failure_mode="deny",
     ).exists()
 
 
