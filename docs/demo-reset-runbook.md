@@ -20,7 +20,9 @@ NEXT_PUBLIC_API_BASE_URL=https://bidals-backend-staging.onrender.com
 3. Run the demo seed command from the Render backend shell:
 
 ```bash
-python manage.py seed_demo
+python manage.py seed_demo \
+  --allow-non-local \
+  --confirm-known-demo-credentials="I understand seed_demo creates known demo credentials"
 ```
 
 4. Verify the staging backend API:
@@ -43,7 +45,7 @@ https://demo.bidals.com/auctions
 | No active event | Frontend is using the wrong API base URL, or the frontend deploy is stale. | Confirm `NEXT_PUBLIC_API_BASE_URL=https://bidals-backend-staging.onrender.com`, redeploy the frontend, then hard refresh `/auctions`. |
 | Unexpected API response shape | Browser or frontend is calling a non-staging backend, old deploy, or wrong endpoint. | Check the Network tab request URL, confirm the backend staging deploy branch/commit, and query the verification URLs directly. |
 | `DisallowedHost` | Backend `ALLOWED_HOSTS` is missing the Render/backend domain. | Add `bidals-backend-staging.onrender.com` to backend `ALLOWED_HOSTS`, redeploy, and retry the API check. |
-| `count: 0` from API | Demo data is missing, archived, or the wrong backend/database is being queried. | Run `python manage.py seed_demo` on the Render backend shell, then verify `/api/auctions/?search=Premium` again. |
+| `count: 0` from API | Demo data is missing, archived, or the wrong backend/database is being queried. | Run the guarded `python manage.py seed_demo --allow-non-local --confirm-known-demo-credentials="I understand seed_demo creates known demo credentials"` command on the Render backend shell, then verify `/api/auctions/?search=Premium` again. |
 | Wrong backend domain in browser Network tab | Frontend build was created with the wrong `NEXT_PUBLIC_API_BASE_URL`. | Update the frontend Render env var, redeploy the frontend so Next.js rebuilds with the staging backend URL, and hard refresh. |
 
-`seed_demo` creates `[Demo]` premium auction/lots and is safe to rerun for demo refreshes.
+`seed_demo` creates `[Demo]` premium auction/lots and known demo credentials. It runs without flags only in local/dev/CI environments; the explicit confirmation above is required for isolated staging/demo refreshes, and production is refused.

@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
+.cache/
+.pip-audit-cache/
 .coverage
 htmlcov/
 *.sqlite3
@@ -17,6 +19,7 @@ backups/
 # Node / Next.js
 node_modules/
 .next/
+.next-build/
 out/
 tsconfig.tsbuildinfo
 npm-debug.log*

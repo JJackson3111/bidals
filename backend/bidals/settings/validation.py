@@ -11,6 +11,7 @@ RATE_LIMIT_SETTINGS = (
     "RATE_LIMIT_PASSWORD_RESET",
     "RATE_LIMIT_ADMIN_ACTIONS",
 )
+RATE_LIMIT_CACHE_FAILURE_MODES = {"allow", "deny"}
 
 
 def missing_required_production_env() -> list[str]:
@@ -68,6 +69,17 @@ def validate_rate_limit_settings(values: dict[str, str | int | None]) -> None:
             + ", ".join(invalid)
             + ". Use formats like '5/minute', '30/hour', or a positive integer per minute."
         )
+
+
+def validate_rate_limit_cache_failure_mode(value: str) -> str:
+    mode = str(value or "").strip().lower()
+    if mode not in RATE_LIMIT_CACHE_FAILURE_MODES:
+        raise ImproperlyConfigured(
+            "RATE_LIMIT_CACHE_FAILURE_MODE must be one of: "
+            + ", ".join(sorted(RATE_LIMIT_CACHE_FAILURE_MODES))
+            + "."
+        )
+    return mode
 
 
 def parse_rate_limit(value: str | int | None, *, setting_name: str = "rate limit") -> tuple[int, int]:

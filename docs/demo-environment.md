@@ -29,10 +29,12 @@ FRONTEND_URL=https://demo.bidals.com
 Run the demo seed command on the backend:
 
 ```bash
-python manage.py seed_demo
+python manage.py seed_demo \
+  --allow-non-local \
+  --confirm-known-demo-credentials="I understand seed_demo creates known demo credentials"
 ```
 
-`seed_demo` creates `[Demo]` premium auction/lots.
+`seed_demo` creates `[Demo]` premium auction/lots and known demo credentials. It runs without flags only in local/dev/CI environments. Staging/demo refreshes require the explicit confirmation above, and production is refused.
 
 ## API Checks
 
@@ -45,4 +47,4 @@ Use these endpoints against the backend staging API:
 
 - Frontend showing no active event usually means wrong `NEXT_PUBLIC_API_BASE_URL` or a stale deploy.
 - `DisallowedHost` means `ALLOWED_HOSTS` is missing the Render/backend domain.
-- If demo data is missing, rerun `python manage.py seed_demo`.
+- If demo data is missing, rerun `python manage.py seed_demo --allow-non-local --confirm-known-demo-credentials="I understand seed_demo creates known demo credentials"`.

@@ -5,7 +5,7 @@ import time
 from django.conf import settings
 from django.core.cache import cache
 
-from apps.audit.security import parse_rate
+from apps.audit.security import parse_rate, rate_limit_cache_failure_allows_requests
 
 logger = logging.getLogger(__name__)
 
@@ -56,20 +56,23 @@ def check_bid_rate_limit(request) -> BidRateLimitResult:
     try:
         count = _increment_key(key, timeout=window_seconds + 5)
     except Exception as exc:
+        allow_request = rate_limit_cache_failure_allows_requests()
         logger.warning(
-            "Bid rate-limit cache unavailable; allowing bid attempt",
+            "Bid rate-limit cache unavailable; %s bid attempt",
+            "allowing" if allow_request else "denying",
             extra={
                 "event": "bid_rate_limit_cache_unavailable",
                 "scope": scope,
                 "key": key,
                 "error_type": type(exc).__name__,
+                "failure_mode": getattr(settings, "RATE_LIMIT_CACHE_FAILURE_MODE", "deny"),
             },
         )
         return BidRateLimitResult(
-            allowed=True,
+            allowed=allow_request,
             limit=limit,
-            remaining=limit,
-            retry_after=0,
+            remaining=limit if allow_request else 0,
+            retry_after=0 if allow_request else window_seconds,
             scope=scope,
             key=key,
             cache_available=False,

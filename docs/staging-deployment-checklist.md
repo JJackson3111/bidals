@@ -20,7 +20,9 @@ Use this checklist for BIDALS demo/staging deploys.
 - [ ] Run demo seed after backend deploy if demo data is required:
 
 ```bash
-python manage.py seed_demo
+python manage.py seed_demo \
+  --allow-non-local \
+  --confirm-known-demo-credentials="I understand seed_demo creates known demo credentials"
 ```
 
 ## Verify

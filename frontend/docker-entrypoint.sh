@@ -16,4 +16,39 @@ if [ -f package-lock.json ]; then
   fi
 fi
 
+if [ "${BIDALS_DOCKER_DEV:-}" = "1" ]; then
+  is_build_command=0
+  if [ "${1:-}" = "npm" ] && [ "${2:-}" = "run" ] && [ "${3:-}" = "build" ]; then
+    is_build_command=1
+  elif [ "${1:-}" = "npx" ] && [ "${2:-}" = "next" ] && [ "${3:-}" = "build" ]; then
+    is_build_command=1
+  elif [ "${1:-}" = "next" ] && [ "${2:-}" = "build" ]; then
+    is_build_command=1
+  fi
+
+  if [ "$is_build_command" = "1" ]; then
+    export NODE_ENV=production
+    export NEXT_DIST_DIR="${NEXT_DIST_DIR:-.next-build}"
+    echo "Using ${NEXT_DIST_DIR} for this one-off build so the dev .next volume remains untouched."
+
+    backup_dir="$(mktemp -d)"
+    for generated_file in next-env.d.ts tsconfig.json; do
+      if [ -f "$generated_file" ]; then
+        cp "$generated_file" "$backup_dir/$generated_file"
+      fi
+    done
+
+    "$@"
+    status="$?"
+
+    for generated_file in next-env.d.ts tsconfig.json; do
+      if [ -f "$backup_dir/$generated_file" ]; then
+        cp "$backup_dir/$generated_file" "$generated_file"
+      fi
+    done
+    rm -rf "$backup_dir"
+    exit "$status"
+  fi
+fi
+
 exec "$@"

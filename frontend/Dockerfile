@@ -12,6 +12,7 @@ ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV BIDALS_DOCKER_DEV=1
 
 COPY package.json package-lock.json ./
 COPY --from=deps /app/node_modules ./node_modules
