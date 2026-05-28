@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 import { MarketingCTA, MarketingFooter, MarketingSection, PageHeader } from "@/components/marketing/MarketingBlocks";
@@ -5,34 +6,53 @@ import { MarketingCTA, MarketingFooter, MarketingSection, PageHeader } from "@/c
 export const metadata: Metadata = {
   title: "Pricing | BIDALS",
   description:
-    "Indicative BIDALS pricing structure for fundraising teams, campaign operators and partner organisations.",
+    "BIDALS pricing packages for Starter, Growth and Partner fundraising teams, supporting auctions, raffles, donations and white-label event needs.",
 };
 
 const plans = [
   {
-    name: "Launch",
-    label: "Single campaign setup",
-    description: "For teams preparing a focused auction, raffle-style campaign or donation-led event.",
-    features: ["Campaign setup support", "Core public fundraising pages", "Admin access for the event team", "Post-event outcome review"],
+    name: "Starter",
+    label: "Focused campaign",
+    description: "For teams preparing one polished auction, raffle-style campaign or donation-led fundraising moment.",
+    features: [
+      "Core auction, raffle or donation setup",
+      "Mobile-first supporter experience",
+      "Event team admin access",
+      "Post-event outcome review",
+    ],
+    cta: "Talk to us about pricing",
   },
   {
     name: "Growth",
     label: "Multi-channel fundraising",
-    description: "For organisations running several fundraising formats or repeat campaigns through the year.",
-    features: ["Auction, raffle and donation workflows", "Expanded admin governance", "Supporter journey review", "Campaign reporting foundations"],
+    description: "For charities and event teams running auctions, raffles and donations through the same campaign.",
+    features: [
+      "Auctions, raffles and donations supported",
+      "Expanded admin governance",
+      "Campaign reporting foundations",
+      "White-label readiness planning",
+    ],
+    cta: "Book a demo",
+    featured: true,
   },
   {
     name: "Partner",
-    label: "Operator and agency model",
-    description: "For silent auction companies and fundraising partners supporting multiple client events.",
-    features: ["Multi-event operating model", "Seller and admin separation", "Workflow consultation", "Custom onboarding plan"],
+    label: "Operator model",
+    description: "For silent auction companies, agencies and fundraising partners supporting multiple client events.",
+    features: [
+      "Multi-event operating model",
+      "Seller and admin separation",
+      "Partner workflow consultation",
+      "Custom onboarding plan",
+    ],
+    cta: "Talk to us about pricing",
   },
 ];
 
 const principles = [
-  "Pricing should reflect event complexity, fundraising model and support needs.",
-  "No exact public prices are committed here until the commercial packaging is final.",
-  "BIDALS should stay transparent about what is included before a customer launches.",
+  "Plans can support auctions, raffles, donations and white-label campaign needs.",
+  "Final pricing should reflect event complexity, support needs and operating model.",
+  "No exact public prices are committed until commercial packaging is approved.",
 ];
 
 export default function PricingPage() {
@@ -40,18 +60,18 @@ export default function PricingPage() {
     <main className="marketing-page">
       <PageHeader
         eyebrow="Pricing"
-        title="SaaS-style pricing shaped around real fundraising operations."
-        description="BIDALS pricing is structured as clear packages for launch, growth and partner use cases. Final pricing can be confirmed during onboarding rather than guessed too early."
+        title="SaaS pricing shaped around fundraising operations."
+        description="BIDALS packages are intentionally clear without publishing unapproved prices. Choose a starting point, then scope the event model properly."
       />
 
       <MarketingSection
         eyebrow="Plans"
-        title="Indicative packaging"
-        description="These placeholders create a proper sales-page structure without committing to final prices before they are approved."
+        title="Starter, Growth and Partner"
+        description="Clean packages for teams launching, scaling or operating premium fundraising campaigns."
       >
         <div className="marketing-pricing-grid">
           {plans.map((plan) => (
-            <article className="marketing-pricing-card" key={plan.name}>
+            <article className={`marketing-pricing-card ${plan.featured ? "marketing-pricing-card-featured" : ""}`} key={plan.name}>
               <span>{plan.label}</span>
               <h2>{plan.name}</h2>
               <p>{plan.description}</p>
@@ -61,15 +81,19 @@ export default function PricingPage() {
                   <li key={feature}>{feature}</li>
                 ))}
               </ul>
+              <Link className="secondary-button marketing-button" href={plan.cta === "Book a demo" ? "/book-demo" : "/contact"}>
+                {plan.cta}
+              </Link>
             </article>
           ))}
         </div>
       </MarketingSection>
 
       <MarketingSection
-        eyebrow="Principles"
-        title="Clear enough to sell, careful enough to evolve"
-        description="The public pricing page should help buyers understand fit while leaving room for final commercial decisions."
+        eyebrow="Commercial clarity"
+        title="Flexible enough to fit the event, clear enough to sell"
+        description="The public page sets the package structure while leaving room for responsible commercial scoping."
+        tone="muted"
       >
         <ul className="marketing-statement-list">
           {principles.map((item) => (
@@ -80,7 +104,9 @@ export default function PricingPage() {
 
       <MarketingCTA
         title="Find the right BIDALS package for your campaign."
-        description="A short demo call can map your event model to the most sensible launch path."
+        description="Talk through your fundraising formats, event scale, white-label needs and support expectations."
+        primaryCta={{ href: "/contact", label: "Talk to us about pricing" }}
+        secondaryCta={{ href: "/book-demo", label: "Book a demo" }}
       />
 
       <MarketingFooter />
