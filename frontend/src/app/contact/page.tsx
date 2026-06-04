@@ -18,9 +18,9 @@ const contactReasons = [
 ];
 
 const supportDetails = [
-  "Use the contact form while a safe inbox or backend workflow is connected.",
+  "Tell us about your fundraising plans, timeline and operating context.",
   "Include your organisation, event timeline and fundraising formats where possible.",
-  "Do not share payment card data, passwords or sensitive supporter information in this frontend-only form.",
+  "Do not share payment card data, passwords or sensitive supporter information.",
 ];
 
 export default function ContactPage() {
@@ -29,7 +29,7 @@ export default function ContactPage() {
       <PageHeader
         eyebrow="Contact"
         title="Talk to BIDALS about secure digital fundraising."
-        description="Share the context for your campaign, support need or partnership conversation. The current form is frontend-only until a safe backend or email workflow is connected."
+        description="Share the context for your campaign, support need or partnership conversation and we will come back to you directly."
       />
 
       <MarketingSection
@@ -41,11 +41,11 @@ export default function ContactPage() {
           <div className="marketing-form-card">
             <span className="marketing-inline-icon">
               <MailQuestion size={19} aria-hidden="true" />
-              Frontend-only contact
+              Contact request
             </span>
             <MarketingLeadForm kind="contact" />
             <p className="marketing-form-note">
-              This form currently stores no message and sends no email. The TODO remains future backend or email integration.
+              We&apos;ll review your request and come back to you directly.
             </p>
           </div>
           <aside className="marketing-side-panel" aria-label="Support and contact details">

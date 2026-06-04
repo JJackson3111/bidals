@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.auctions",
     "apps.audit",
+    "apps.leads",
 ]
 
 MIDDLEWARE = [
@@ -240,6 +241,7 @@ RATE_LIMIT_REGISTRATION = env("RATE_LIMIT_REGISTRATION", default="5/minute")
 RATE_LIMIT_BID_CREATE = env("RATE_LIMIT_BID_CREATE", default="")
 RATE_LIMIT_PASSWORD_RESET = env("RATE_LIMIT_PASSWORD_RESET", default="3/hour")
 RATE_LIMIT_ADMIN_ACTIONS = env("RATE_LIMIT_ADMIN_ACTIONS", default="30/minute")
+RATE_LIMIT_LEAD_REQUESTS = env("RATE_LIMIT_LEAD_REQUESTS", default="3/hour")
 validate_rate_limit_settings(
     {
         "RATE_LIMIT_LOGIN": RATE_LIMIT_LOGIN,
@@ -247,6 +249,7 @@ validate_rate_limit_settings(
         "RATE_LIMIT_BID_CREATE": RATE_LIMIT_BID_CREATE,
         "RATE_LIMIT_PASSWORD_RESET": RATE_LIMIT_PASSWORD_RESET,
         "RATE_LIMIT_ADMIN_ACTIONS": RATE_LIMIT_ADMIN_ACTIONS,
+        "RATE_LIMIT_LEAD_REQUESTS": RATE_LIMIT_LEAD_REQUESTS,
     }
 )
 BID_ANOMALY_REJECT_THRESHOLD = env.int("BID_ANOMALY_REJECT_THRESHOLD", default=5)

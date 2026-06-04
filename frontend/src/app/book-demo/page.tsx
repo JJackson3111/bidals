@@ -14,7 +14,7 @@ const demoTopics = [
   "How your auction, raffle and donation flows should work together.",
   "Where bidder confidence, close-down rules and audit trails matter most.",
   "What white-label, reporting and governance needs your event team has.",
-  "Which backend or email workflow should safely handle future lead submissions.",
+  "What a confident launch plan should include for your team and supporters.",
 ];
 
 export default function BookDemoPage() {
@@ -23,7 +23,7 @@ export default function BookDemoPage() {
       <PageHeader
         eyebrow="Book a demo"
         title="See BIDALS as your fundraising operating system."
-        description="Use this frontend-only request form to capture demo intent while the backend or email integration is planned."
+        description="Request a focused walkthrough for auctions, raffles, donations and premium event operations."
       />
 
       <MarketingSection
@@ -51,17 +51,17 @@ export default function BookDemoPage() {
                 { label: "Formats", value: "3", detail: "Auctions, raffles, donations" },
                 { label: "Readiness", value: "Scoped", detail: "Brand, payment and governance needs" },
               ]}
-              note="Frontend-only form today. TODO: connect to an approved backend or email workflow."
+              note="We will use your request to shape a practical, relevant demo conversation."
             />
           </aside>
           <div className="marketing-form-card">
             <span className="marketing-inline-icon">
               <ShieldCheck size={19} aria-hidden="true" />
-              Frontend-only capture
+              Demo request
             </span>
             <MarketingLeadForm kind="demo" />
             <p className="marketing-form-note">
-              This form does not send to a backend yet. The TODO remains to connect a safe lead or email integration.
+              We&apos;ll review your request and come back to you directly.
             </p>
           </div>
         </div>

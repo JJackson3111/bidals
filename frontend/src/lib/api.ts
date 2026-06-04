@@ -13,6 +13,8 @@ import type {
   FulfillmentTimelineResponse,
   FulfillmentResponse,
   FulfillmentUpdateInput,
+  LeadRequestInput,
+  LeadRequestResponse,
   LoginResponse,
   Lot,
   LotImage,
@@ -263,6 +265,14 @@ export const api = {
 
   async register(input: RegisterInput): Promise<User> {
     return apiFetch<User>("/auth/register/", {
+      method: "POST",
+      auth: false,
+      body: JSON.stringify(input),
+    });
+  },
+
+  async submitLeadRequest(input: LeadRequestInput): Promise<LeadRequestResponse> {
+    return apiFetch<LeadRequestResponse>("/leads/", {
       method: "POST",
       auth: false,
       body: JSON.stringify(input),

@@ -7101,13 +7101,16 @@ p {
 }
 
 .marketing-form {
-  background: rgba(255, 253, 247, 0.94);
-  border: 1px solid rgba(16, 23, 20, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 253, 247, 0.94)),
+    #fffdf7;
+  border: 1px solid rgba(16, 23, 20, 0.12);
   border-radius: 8px;
   box-shadow: 0 20px 48px rgba(16, 23, 20, 0.1);
   display: grid;
-  gap: 16px;
+  gap: 18px;
   padding: 24px;
+  position: relative;
 }
 
 .marketing-form .form-grid {
@@ -7116,12 +7119,72 @@ p {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.marketing-form .form-field label {
+  color: #27332e;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+}
+
+.marketing-form .form-field input,
+.marketing-form .form-field select,
+.marketing-form .form-field textarea {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(16, 23, 20, 0.16);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.78) inset;
+}
+
+.marketing-form .form-field input:focus-visible,
+.marketing-form .form-field select:focus-visible,
+.marketing-form .form-field textarea:focus-visible {
+  border-color: rgba(16, 23, 20, 0.42);
+  box-shadow:
+    0 0 0 3px rgba(206, 251, 4, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.78) inset;
+  outline: none;
+}
+
+.marketing-form .form-field textarea {
+  min-height: 138px;
+}
+
 .marketing-form-wide {
   grid-column: 1 / -1;
 }
 
 .marketing-form-submit {
   justify-self: start;
+}
+
+.marketing-form-submit:disabled {
+  box-shadow: none;
+  transform: none;
+}
+
+.marketing-form-status {
+  border: 1px solid transparent;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.marketing-form .form-success {
+  background: rgba(206, 251, 4, 0.18);
+  border-color: rgba(16, 23, 20, 0.12);
+  color: var(--marketing-ink);
+}
+
+.marketing-form .form-error {
+  background: #fff5f3;
+  border-color: rgba(191, 61, 61, 0.28);
+  color: #9f2f2f;
+}
+
+.marketing-honeypot {
+  height: 0;
+  left: -9999px;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
 }
 
 .marketing-form-note {
