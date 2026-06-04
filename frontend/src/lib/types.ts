@@ -451,6 +451,33 @@ export interface RegisterInput {
   account_type: "bidder" | "seller";
 }
 
+export type LeadSourcePage = "book_demo" | "contact";
+export type FundraisingFocus =
+  | "auctions"
+  | "raffles"
+  | "donations"
+  | "multi_channel"
+  | "general_enquiry"
+  | "partnership"
+  | "support"
+  | "other";
+
+export interface LeadRequestInput {
+  name: string;
+  email: string;
+  organisation: string;
+  fundraising_focus: FundraisingFocus;
+  message: string;
+  source_page: LeadSourcePage;
+  website?: string;
+}
+
+export interface LeadRequestResponse extends LeadRequestInput {
+  id: number;
+  created_at: string;
+  status: "new" | "reviewed" | "contacted" | "archived";
+}
+
 export interface CreateAuctionInput {
   title: string;
   description: string;

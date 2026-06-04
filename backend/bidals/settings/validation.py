@@ -10,7 +10,16 @@ RATE_LIMIT_SETTINGS = (
     "RATE_LIMIT_BID_CREATE",
     "RATE_LIMIT_PASSWORD_RESET",
     "RATE_LIMIT_ADMIN_ACTIONS",
+    "RATE_LIMIT_LEAD_REQUESTS",
 )
+RATE_LIMIT_DEFAULTS = {
+    "RATE_LIMIT_LOGIN": "5/minute",
+    "RATE_LIMIT_REGISTRATION": "5/minute",
+    "RATE_LIMIT_BID_CREATE": "",
+    "RATE_LIMIT_PASSWORD_RESET": "3/hour",
+    "RATE_LIMIT_ADMIN_ACTIONS": "30/minute",
+    "RATE_LIMIT_LEAD_REQUESTS": "3/hour",
+}
 RATE_LIMIT_CACHE_FAILURE_MODES = {"allow", "deny"}
 
 
@@ -54,7 +63,7 @@ def assert_required_production_env() -> None:
 def validate_rate_limit_settings(values: dict[str, str | int | None]) -> None:
     invalid: list[str] = []
     for name in RATE_LIMIT_SETTINGS:
-        raw_value = values.get(name)
+        raw_value = values[name] if name in values else RATE_LIMIT_DEFAULTS[name]
         if name == "RATE_LIMIT_BID_CREATE" and not str(raw_value or "").strip():
             continue
 

@@ -12,6 +12,7 @@ from apps.accounts.models import UserRole
 from apps.audit.models import AuditAction, AuditLog
 from bidals.settings.origins import comma_separated_urls, configured_origins, merge_origins
 from bidals.settings.validation import (
+    RATE_LIMIT_DEFAULTS,
     missing_required_production_env,
     validate_rate_limit_cache_failure_mode,
     validate_rate_limit_settings,
@@ -147,29 +148,31 @@ def test_production_env_validation_accepts_render_origin_aliases(monkeypatch):
     assert missing_required_production_env() == []
 
 
+def valid_rate_limit_settings(**overrides):
+    values = dict(RATE_LIMIT_DEFAULTS)
+    values.update(overrides)
+    return values
+
+
 def test_invalid_rate_limit_values_fail_validation_before_request_time():
     with pytest.raises(ImproperlyConfigured, match="RATE_LIMIT_LOGIN"):
-        validate_rate_limit_settings(
-            {
-                "RATE_LIMIT_LOGIN": "fast",
-                "RATE_LIMIT_REGISTRATION": "5/minute",
-                "RATE_LIMIT_BID_CREATE": "",
-                "RATE_LIMIT_PASSWORD_RESET": "3/hour",
-                "RATE_LIMIT_ADMIN_ACTIONS": "30/minute",
-            }
-        )
+        validate_rate_limit_settings(valid_rate_limit_settings(RATE_LIMIT_LOGIN="fast"))
 
 
 def test_blank_bid_create_rate_limit_is_valid_for_bid_specific_fallback():
-    validate_rate_limit_settings(
-        {
-            "RATE_LIMIT_LOGIN": "5/minute",
-            "RATE_LIMIT_REGISTRATION": "5/minute",
-            "RATE_LIMIT_BID_CREATE": "",
-            "RATE_LIMIT_PASSWORD_RESET": "3/hour",
-            "RATE_LIMIT_ADMIN_ACTIONS": "30/minute",
-        }
-    )
+    legacy_settings = valid_rate_limit_settings()
+    legacy_settings.pop("RATE_LIMIT_LEAD_REQUESTS")
+
+    validate_rate_limit_settings(legacy_settings)
+
+
+def test_single_digit_lead_request_rate_limit_is_valid():
+    validate_rate_limit_settings(valid_rate_limit_settings(RATE_LIMIT_LEAD_REQUESTS="3/hour"))
+
+
+def test_invalid_lead_request_rate_limit_fails_validation_before_request_time():
+    with pytest.raises(ImproperlyConfigured, match="RATE_LIMIT_LEAD_REQUESTS"):
+        validate_rate_limit_settings(valid_rate_limit_settings(RATE_LIMIT_LEAD_REQUESTS="3/fortnight"))
 
 
 def test_invalid_rate_limit_cache_failure_mode_fails_validation():
