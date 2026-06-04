@@ -6278,6 +6278,12 @@ p {
   stroke: var(--marketing-ink);
 }
 
+.marketing-trust-list svg.marketing-trust-check {
+  color: #CEFB04;
+  filter: drop-shadow(0 0 10px rgba(206, 251, 4, 0.18));
+  stroke: #CEFB04;
+}
+
 .marketing-hero-scene {
   min-height: 610px;
   position: relative;

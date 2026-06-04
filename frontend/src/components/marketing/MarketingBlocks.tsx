@@ -442,7 +442,7 @@ export function TrustSection({ eyebrow = "Trust layer", title, description, item
         <ul className="marketing-trust-list">
           {items.map((item) => (
             <li key={item}>
-              <CheckCircle2 size={18} aria-hidden="true" />
+              <CheckCircle2 className="marketing-trust-check" size={18} aria-hidden="true" />
               <span>{item}</span>
             </li>
           ))}
