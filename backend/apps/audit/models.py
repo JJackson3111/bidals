@@ -62,6 +62,16 @@ class AuditAction(models.TextChoices):
     FULFILLMENT_COMPLETED = "fulfillment_completed", "Fulfillment completed"
     FULFILLMENT_CANCELLED = "fulfillment_cancelled", "Fulfillment cancelled"
     FULFILLMENT_DISPUTED = "fulfillment_disputed", "Fulfillment disputed"
+    RAFFLE_CAMPAIGN_CREATED = "raffle_campaign_created", "Raffle campaign created"
+    RAFFLE_CAMPAIGN_UPDATED = "raffle_campaign_updated", "Raffle campaign updated"
+    RAFFLE_PRIZE_CREATED = "raffle_prize_created", "Raffle prize created"
+    RAFFLE_PURCHASE_COMPLETED = "raffle_purchase_completed", "Raffle purchase completed"
+    RAFFLE_TICKETS_ISSUED = "raffle_tickets_issued", "Raffle tickets issued"
+    RAFFLE_CLOSED = "raffle_closed", "Raffle closed"
+    RAFFLE_DRAW_EXECUTED = "raffle_draw_executed", "Raffle draw executed"
+    RAFFLE_WINNER_ASSIGNED = "raffle_winner_assigned", "Raffle winner assigned"
+    RAFFLE_CANCELLED = "raffle_cancelled", "Raffle cancelled"
+    RAFFLE_OUTCOME_REPAIR_REQUESTED = "raffle_outcome_repair_requested", "Raffle outcome repair requested"
     ADMIN_ACTION = "admin_action", "Admin action"
 
 
