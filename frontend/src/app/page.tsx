@@ -10,9 +10,11 @@ import {
   ClipboardCheck,
   Gavel,
   HeartHandshake,
+  Monitor,
   Palette,
   ShieldCheck,
   Sparkles,
+  Smartphone,
   Ticket,
   Trophy,
   UsersRound,
@@ -38,6 +40,22 @@ type ProofCard = {
   title: string;
   description: string;
   icon: LucideIcon;
+};
+
+type BrandTheme = {
+  id: string;
+  organisation: string;
+  event: string;
+  initials: string;
+  accent: string;
+  palette: string;
+  story: string;
+  lot: string;
+  lotMeta: string;
+  currentBid: string;
+  nextBid: string;
+  donation: string;
+  raffle: string;
 };
 
 const trustChips = ["Mobile-first experiences", "Server-authoritative records", "Enterprise-grade governance"];
@@ -159,13 +177,81 @@ const leaderboard = [
   { name: "Signed guitar", value: "GBP 1,340" },
 ];
 
-const brandSignals = [
+const brandThemes: BrandTheme[] = [
+  {
+    id: "harbour",
+    organisation: "Harbour House Foundation",
+    event: "Spring Gala 2026",
+    initials: "HH",
+    accent: "Acid green / muted teal",
+    palette: "Signature gala",
+    story: "A polished evening auction supporting long-term community projects.",
+    lot: "Chef's table for eight",
+    lotMeta: "Live lot 18",
+    currentBid: "GBP 2,550",
+    nextBid: "Quick bid GBP 2,700",
+    donation: "Children's appeal GBP 12.8k",
+    raffle: "Grand prize raffle 184 entries",
+  },
+  {
+    id: "mary",
+    organisation: "St Mary's School",
+    event: "Summer Giving Evening",
+    initials: "SM",
+    accent: "Warm gold / deep navy",
+    palette: "School evening",
+    story: "A confident supporter journey for parents, alumni and local sponsors.",
+    lot: "Headteacher's dinner",
+    lotMeta: "Live lot 07",
+    currentBid: "GBP 1,180",
+    nextBid: "Quick bid GBP 1,250",
+    donation: "Library appeal GBP 6.4k",
+    raffle: "Family hamper 96 entries",
+  },
+  {
+    id: "oakfield",
+    organisation: "Oakfield Hospice",
+    event: "Care & Community Auction",
+    initials: "OH",
+    accent: "Soft lavender / deep plum",
+    palette: "Care campaign",
+    story: "A calm, warm auction experience built around donor confidence.",
+    lot: "Garden retreat weekend",
+    lotMeta: "Live lot 12",
+    currentBid: "GBP 1,760",
+    nextBid: "Quick bid GBP 1,850",
+    donation: "Care fund GBP 18.2k",
+    raffle: "Memory tree raffle 142 entries",
+  },
+  {
+    id: "sports",
+    organisation: "Local Sports Trust",
+    event: "Clubhouse Fundraiser",
+    initials: "LST",
+    accent: "Bright green / dark graphite",
+    palette: "Club campaign",
+    story: "A direct, energetic experience for members, families and sponsors.",
+    lot: "Signed matchday shirt",
+    lotMeta: "Live lot 03",
+    currentBid: "GBP 820",
+    nextBid: "Quick bid GBP 900",
+    donation: "Youth teams GBP 9.1k",
+    raffle: "Season ticket raffle 211 entries",
+  },
+];
+
+const brandStudioElements = [
   "Organisation logo",
   "Event branding",
   "Brand colour accents",
   "Supporter-facing experience",
-  "Admin controls",
+  "Phone and desktop previews",
   "BIDALS operating layer beneath",
+];
+
+const brandViews = [
+  { id: "phone", label: "Phone view", icon: Smartphone },
+  { id: "desktop", label: "Desktop view", icon: Monitor },
 ];
 
 const choiceCards: ProofCard[] = [
@@ -380,6 +466,183 @@ function OperatingDashboard() {
   );
 }
 
+function PhoneSupporterPreview({ theme }: { theme: BrandTheme }) {
+  return (
+    <article className={`home-brand-preview home-preview-theme-${theme.id} home-preview-phone`}>
+      <div className={`home-supporter-phone home-theme-${theme.id}`}>
+        <div className="home-supporter-phone-top">
+          <span className="home-supporter-logo">{theme.initials}</span>
+          <div>
+            <span>{theme.organisation}</span>
+            <strong>{theme.event}</strong>
+          </div>
+        </div>
+        <div className="home-supporter-lot-card">
+          <div className="home-supporter-lot-media" aria-hidden="true">
+            <span />
+          </div>
+          <span>{theme.lotMeta}</span>
+          <h3>{theme.lot}</h3>
+          <p>{theme.story}</p>
+          <div className="home-supporter-bid-row">
+            <span>Current bid</span>
+            <strong>{theme.currentBid}</strong>
+          </div>
+          <button type="button" tabIndex={-1}>
+            {theme.nextBid}
+          </button>
+        </div>
+        <div className="home-supporter-mini-grid">
+          <span>
+            <HeartHandshake size={15} aria-hidden="true" />
+            {theme.donation}
+          </span>
+          <span>
+            <Ticket size={15} aria-hidden="true" />
+            {theme.raffle}
+          </span>
+        </div>
+        <small>Powered by BIDALS</small>
+      </div>
+    </article>
+  );
+}
+
+function DesktopSupporterPreview({ theme }: { theme: BrandTheme }) {
+  return (
+    <article className={`home-brand-preview home-preview-theme-${theme.id} home-preview-desktop`}>
+      <div className={`home-supporter-desktop home-theme-${theme.id}`}>
+        <header className="home-supporter-desktop-header">
+          <div>
+            <span className="home-supporter-logo">{theme.initials}</span>
+            <div>
+              <span>{theme.organisation}</span>
+              <strong>{theme.event}</strong>
+            </div>
+          </div>
+          <small>Powered by BIDALS</small>
+        </header>
+        <div className="home-supporter-desktop-grid">
+          <section className="home-supporter-hero-lot">
+            <div className="home-supporter-lot-media" aria-hidden="true">
+              <span />
+            </div>
+            <span>{theme.lotMeta}</span>
+            <h3>{theme.lot}</h3>
+            <p>{theme.story}</p>
+          </section>
+          <aside className="home-supporter-bid-panel">
+            <span>Current bid</span>
+            <strong>{theme.currentBid}</strong>
+            <button type="button" tabIndex={-1}>
+              {theme.nextBid}
+            </button>
+            <div>
+              <span>
+                <HeartHandshake size={15} aria-hidden="true" />
+                {theme.donation}
+              </span>
+              <span>
+                <Ticket size={15} aria-hidden="true" />
+                {theme.raffle}
+              </span>
+            </div>
+          </aside>
+        </div>
+        <div className="home-supporter-auction-grid" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function BrandPreviewStudio() {
+  return (
+    <div className="home-brand-studio">
+      {brandThemes.map((theme, index) => (
+        <input
+          className={`home-brand-radio brand-theme-${theme.id}`}
+          defaultChecked={index === 0}
+          id={`brand-theme-${theme.id}`}
+          key={theme.id}
+          name="brand-theme"
+          type="radio"
+        />
+      ))}
+      {brandViews.map((view, index) => (
+        <input
+          className={`home-brand-radio brand-view-${view.id}`}
+          defaultChecked={index === 0}
+          id={`brand-view-${view.id}`}
+          key={view.id}
+          name="brand-view"
+          type="radio"
+        />
+      ))}
+
+      <div className="home-brand-studio-layout">
+        <aside className="home-brand-control-panel" aria-label="Brand Preview Studio controls">
+          <div className="home-brand-control-heading">
+            <span className="home-eyebrow">Brand Preview Studio</span>
+            <h3>See the bidder-facing experience shift by organisation.</h3>
+          </div>
+
+          <div className="home-theme-options" aria-label="Saved example organisation themes">
+            {brandThemes.map((theme) => (
+              <label className={`home-theme-option brand-theme-label-${theme.id}`} htmlFor={`brand-theme-${theme.id}`} key={theme.id}>
+                <span className={`home-theme-swatch home-theme-${theme.id}`} aria-hidden="true">
+                  {theme.initials}
+                </span>
+                <span>
+                  <strong>{theme.organisation}</strong>
+                  <small>{theme.event}</small>
+                </span>
+                <em>{theme.palette}</em>
+              </label>
+            ))}
+          </div>
+
+          <div className="home-view-toggle" aria-label="Preview view toggle">
+            {brandViews.map((view) => {
+              const Icon = view.icon;
+
+              return (
+                <label className={`home-view-option brand-view-label-${view.id}`} htmlFor={`brand-view-${view.id}`} key={view.id}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{view.label}</span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="home-studio-meta">
+            <span>
+              <Palette size={16} aria-hidden="true" />
+              Theme colour accents
+            </span>
+            <span>
+              <ShieldCheck size={16} aria-hidden="true" />
+              BIDALS operating layer
+            </span>
+          </div>
+        </aside>
+
+        <div className="home-brand-preview-stage" aria-label="Bidder-facing branded supporter preview">
+          {brandThemes.map((theme) => (
+            <PhoneSupporterPreview key={`phone-${theme.id}`} theme={theme} />
+          ))}
+          {brandThemes.map((theme) => (
+            <DesktopSupporterPreview key={`desktop-${theme.id}`} theme={theme} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <main className="marketing-page homepage-v2">
@@ -455,49 +718,21 @@ export default function HomePage() {
       </section>
 
       <section className="home-section">
-        <div className="home-container home-brand-grid">
-          <div className="home-brand-visual" aria-label="Illustrative branded BIDALS deployment">
-            <div className="home-brand-card">
-              <div className="home-brand-header">
-                <span className="home-brand-logo">HH</span>
-                <div>
-                  <span>Harbour House Foundation</span>
-                  <strong>Spring Gala 2026</strong>
-                </div>
-              </div>
-              <div className="home-brand-banner">
-                <span>Event-branded fundraising</span>
-                <strong>Bid, enter, donate</strong>
-              </div>
-              <div className="home-brand-controls">
-                <span>
-                  <Palette size={16} aria-hidden="true" />
-                  Brand colour accents
-                </span>
-                <span>
-                  <ShieldCheck size={16} aria-hidden="true" />
-                  Admin controls
-                </span>
-              </div>
-              <div className="home-brand-layer">
-                <Sparkles size={17} aria-hidden="true" />
-                <span>BIDALS operating layer beneath</span>
-              </div>
-            </div>
-          </div>
+        <div className="home-container home-brand-section">
           <div className="home-brand-copy">
             <span className="home-eyebrow">Brand-led deployment</span>
             <h2>Your organisation. Front and centre.</h2>
             <p>
-              Run campaigns with your event identity, organisation branding and supporter experience leading the journey
-              - powered quietly by BIDALS underneath.
+              Show supporters an experience led by your event identity, organisation colours and campaign story — with
+              BIDALS powering the operating layer underneath.
             </p>
             <div className="home-brand-tags" aria-label="Brand-led deployment elements">
-              {brandSignals.map((signal) => (
+              {brandStudioElements.map((signal) => (
                 <span key={signal}>{signal}</span>
               ))}
             </div>
           </div>
+          <BrandPreviewStudio />
         </div>
       </section>
 
