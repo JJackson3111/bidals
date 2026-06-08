@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, LogOut, Menu, X } from "lucide-react";
 
 import { useAuth } from "@/components/AuthProvider";
 import { api } from "@/lib/api";
 import { canManageAuctions } from "@/lib/auth";
 
 const productNavItems = [
-  { href: "/auctions", label: "Browse", icon: Search },
+  { href: "/features", label: "Features" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/pricing", label: "Pricing" },
 ];
@@ -22,6 +22,11 @@ export function MobileNav() {
   const { user, logout } = useAuth();
   const canUseDashboard = canManageAuctions(user);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let isActive = true;
@@ -58,9 +63,32 @@ export function MobileNav() {
     router.push("/");
   }
 
+  function isProductNavActive(href: string) {
+    if (href === "/features") return pathname === "/features";
+    if (href === "/pricing") return pathname === "/pricing";
+    return false;
+  }
+
+  function renderProductNavLinks() {
+    return productNavItems.map((item) => {
+      const isActive = isProductNavActive(item.href);
+
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={`nav-product-link ${isActive ? "active" : ""}`}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          <span>{item.label}</span>
+        </Link>
+      );
+    });
+  }
+
   return (
     <header className="mobile-nav">
-      <Link href="/" className="brand-link" aria-label="BIDALS home">
+      <Link href="/" className="brand-link" aria-label="BIDALS home" onClick={() => setIsMenuOpen(false)}>
         <span className="brand-mark">
           <Image className="brand-logo" src="/bidals-logo-mark.png" alt="" width={36} height={36} aria-hidden="true" priority />
         </span>
@@ -68,19 +96,20 @@ export function MobileNav() {
       </Link>
 
       <nav className="product-nav" aria-label="Product navigation">
-        {productNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = item.href === "/auctions" && (pathname === "/auctions" || pathname.startsWith("/auctions/"));
-          return (
-            <Link key={item.href} href={item.href} className={`nav-product-link ${isActive ? "active" : ""}`}>
-              {Icon ? <Icon size={15} aria-hidden="true" /> : null}
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        {renderProductNavLinks()}
       </nav>
 
       <nav className="nav-actions" aria-label="Primary navigation">
+        <button
+          className="nav-menu-button"
+          type="button"
+          aria-controls="mobile-marketing-navigation"
+          aria-expanded={isMenuOpen}
+          aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+          onClick={() => setIsMenuOpen((current) => !current)}
+        >
+          {isMenuOpen ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+        </button>
         {user ? (
           <>
             <Link className="nav-utility-link" href="/account/notifications" title="Alerts" aria-label="Alerts">
@@ -98,13 +127,9 @@ export function MobileNav() {
               {canUseDashboard ? "Dashboard" : "Won lots"}
             </Link>
           </>
-        ) : (
-          <Link className="nav-secondary-action nav-login-action" href="/login">
-            Login
-          </Link>
-        )}
-        <Link className="nav-primary-action" href="/dashboard/auctions/new">
-          Start Auction
+        ) : null}
+        <Link className="nav-primary-action" href="/book-demo" onClick={() => setIsMenuOpen(false)}>
+          Book a demo
         </Link>
         {user ? (
           <button className="nav-logout-button" type="button" onClick={handleLogout} title="Logout" aria-label="Logout">
@@ -112,6 +137,12 @@ export function MobileNav() {
           </button>
         ) : null}
       </nav>
+
+      {isMenuOpen ? (
+        <nav className="mobile-menu-panel" id="mobile-marketing-navigation" aria-label="Mobile marketing navigation">
+          {renderProductNavLinks()}
+        </nav>
+      ) : null}
     </header>
   );
 }

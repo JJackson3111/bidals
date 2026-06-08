@@ -36,6 +36,8 @@ type PlatformModule = {
   icon: LucideIcon;
   signal: string;
   metric: string;
+  imageSrc?: string;
+  imageAlt?: string;
 };
 
 type ProofCard = {
@@ -64,7 +66,14 @@ type BrandTheme = {
   raffle: string;
   activity: string;
   progress: string;
-  lots: string[];
+  lotImageSrc: string;
+  lotImageAlt: string;
+  lots: {
+    title: string;
+    bid: string;
+    imageSrc: string;
+    imageAlt: string;
+  }[];
 };
 
 const trustChips = ["Mobile-first experiences", "Server-authoritative records", "Enterprise-grade governance"];
@@ -76,6 +85,8 @@ const phoneMoments = [
     meta: "42 live lots",
     value: "From GBP 180",
     detail: "Supporters browse auction, raffle and donation moments from one mobile journey.",
+    imageSrc: "/demo-lots/vacation-dinner.webp",
+    imageAlt: "Gala dinner table set for a charity auction",
   },
   {
     eyebrow: "Live auction",
@@ -83,6 +94,8 @@ const phoneMoments = [
     meta: "12 active bidders",
     value: "GBP 2,400",
     detail: "Watchlist active with live bid history and controlled close timing.",
+    imageSrc: "/demo-lots/vacation-dinner.webp",
+    imageAlt: "Chef's table dining experience offered as an auction lot",
   },
   {
     eyebrow: "Bid accepted state",
@@ -90,6 +103,8 @@ const phoneMoments = [
     meta: "Server record created",
     value: "GBP 2,550",
     detail: "The accepted bid is recorded by the platform and reflected immediately.",
+    imageSrc: "/demo-lots/watch-hero.webp",
+    imageAlt: "Premium watch auction lot after a bid has been accepted",
   },
   {
     eyebrow: "Auction progress",
@@ -97,6 +112,8 @@ const phoneMoments = [
     meta: "Outcome ready",
     value: "86%",
     detail: "Campaign progress, reserve status and next actions remain visible.",
+    imageSrc: "/demo-lots/wine-hero.webp",
+    imageAlt: "Wine collection auction lot with reserve met",
   },
   {
     eyebrow: "Donation moment",
@@ -104,6 +121,8 @@ const phoneMoments = [
     meta: "Gift received",
     value: "GBP 125",
     detail: "Donation paths sit beside auction activity without breaking the supporter flow.",
+    imageSrc: "/demo-lots/vacation-resort.webp",
+    imageAlt: "Community fundraising appeal image for supporter donations",
   },
   {
     eyebrow: "Raffle moment",
@@ -111,6 +130,8 @@ const phoneMoments = [
     meta: "184 entries",
     value: "GBP 3,680",
     detail: "Raffle participation is captured with clear organiser review.",
+    imageSrc: "/demo-lots/wine-lifestyle.webp",
+    imageAlt: "Raffle prize hamper styled for a fundraising event",
   },
   {
     eyebrow: "Winner confirmation",
@@ -118,6 +139,8 @@ const phoneMoments = [
     meta: "Outcome governed",
     value: "Lot 18",
     detail: "Final outcomes can be reviewed, repaired and defended after the event.",
+    imageSrc: "/demo-lots/vacation-room.webp",
+    imageAlt: "Auction prize experience shown after winner confirmation",
   },
 ];
 
@@ -138,6 +161,8 @@ const platformModules: PlatformModule[] = [
     icon: Gavel,
     signal: "Live bidding",
     metric: "42 lots",
+    imageSrc: "/demo-lots/watch-hero.webp",
+    imageAlt: "Premium watch lot presented in a live auction",
   },
   {
     title: "Raffles",
@@ -146,6 +171,8 @@ const platformModules: PlatformModule[] = [
     icon: Ticket,
     signal: "Draw review",
     metric: "184 entries",
+    imageSrc: "/demo-lots/wine-lifestyle.webp",
+    imageAlt: "Raffle prize hamper for event supporters",
   },
   {
     title: "Donations",
@@ -154,6 +181,8 @@ const platformModules: PlatformModule[] = [
     icon: HeartHandshake,
     signal: "Gift path",
     metric: "GBP 12.8k",
+    imageSrc: "/demo-lots/vacation-resort.webp",
+    imageAlt: "Fundraising appeal imagery for donation moments",
   },
   {
     title: "Analytics",
@@ -207,7 +236,28 @@ const brandThemes: BrandTheme[] = [
     raffle: "Grand prize raffle 184 entries",
     activity: "Maya joined the watchlist",
     progress: "86% to target",
-    lots: ["Weekend retreat", "Signed guitar", "Gallery preview"],
+    lotImageSrc: "/demo-lots/vacation-dinner.webp",
+    lotImageAlt: "Chef's table dinner at a premium fundraising gala",
+    lots: [
+      {
+        title: "Weekend retreat",
+        bid: "GBP 1,920",
+        imageSrc: "/demo-lots/vacation-resort.webp",
+        imageAlt: "Weekend retreat auction lot at a resort",
+      },
+      {
+        title: "Reserve watch",
+        bid: "GBP 1,340",
+        imageSrc: "/demo-lots/watch-box.webp",
+        imageAlt: "Boxed watch auction lot",
+      },
+      {
+        title: "Cellar selection",
+        bid: "GBP 760",
+        imageSrc: "/demo-lots/wine-hero.webp",
+        imageAlt: "Wine selection auction lot",
+      },
+    ],
   },
   {
     id: "mary",
@@ -229,7 +279,28 @@ const brandThemes: BrandTheme[] = [
     raffle: "Family hamper 96 entries",
     activity: "Alumni table placed a bid",
     progress: "74% to target",
-    lots: ["Sports day seats", "Choir recording", "Art room bundle"],
+    lotImageSrc: "/demo-lots/wine-lifestyle.webp",
+    lotImageAlt: "Community event hamper styled for a school giving evening",
+    lots: [
+      {
+        title: "Sports day seats",
+        bid: "GBP 640",
+        imageSrc: "/demo-lots/vacation-spa.webp",
+        imageAlt: "School community experience auction lot",
+      },
+      {
+        title: "Choir recording",
+        bid: "GBP 520",
+        imageSrc: "/demo-lots/wine-detail.webp",
+        imageAlt: "Gift set auction lot for a school fundraiser",
+      },
+      {
+        title: "Art room bundle",
+        bid: "GBP 410",
+        imageSrc: "/demo-lots/watch-detail.webp",
+        imageAlt: "Detailed auction item image for a school fundraiser",
+      },
+    ],
   },
   {
     id: "oakfield",
@@ -251,7 +322,28 @@ const brandThemes: BrandTheme[] = [
     raffle: "Memory tree raffle 142 entries",
     activity: "Donor circle gift received",
     progress: "91% to target",
-    lots: ["Private chef night", "Wellness hamper", "Ceramic collection"],
+    lotImageSrc: "/demo-lots/vacation-room.webp",
+    lotImageAlt: "Weekend retreat auction lot for a hospice community fundraiser",
+    lots: [
+      {
+        title: "Private chef night",
+        bid: "GBP 1,420",
+        imageSrc: "/demo-lots/vacation-dinner.webp",
+        imageAlt: "Private chef dinner auction lot",
+      },
+      {
+        title: "Wellness hamper",
+        bid: "GBP 690",
+        imageSrc: "/demo-lots/wine-lifestyle.webp",
+        imageAlt: "Wellness hamper styled for a community auction",
+      },
+      {
+        title: "Retreat stay",
+        bid: "GBP 1,180",
+        imageSrc: "/demo-lots/vacation-resort.webp",
+        imageAlt: "Retreat stay auction lot for hospice fundraising",
+      },
+    ],
   },
   {
     id: "sports",
@@ -273,7 +365,28 @@ const brandThemes: BrandTheme[] = [
     raffle: "Season ticket raffle 211 entries",
     activity: "Club sponsor raised the bid",
     progress: "68% to target",
-    lots: ["Training session", "Clubhouse dinner", "Finals tickets"],
+    lotImageSrc: "/demo-lots/watch-detail.webp",
+    lotImageAlt: "Signed sports memorabilia-style auction lot",
+    lots: [
+      {
+        title: "Training session",
+        bid: "GBP 560",
+        imageSrc: "/demo-lots/watch-hero.webp",
+        imageAlt: "Premium item representing a club training session auction lot",
+      },
+      {
+        title: "Clubhouse dinner",
+        bid: "GBP 740",
+        imageSrc: "/demo-lots/vacation-dinner.webp",
+        imageAlt: "Clubhouse dinner auction lot",
+      },
+      {
+        title: "Finals tickets",
+        bid: "GBP 980",
+        imageSrc: "/demo-lots/vacation-room.webp",
+        imageAlt: "Event experience auction lot for a sports trust fundraiser",
+      },
+    ],
   },
 ];
 
@@ -342,8 +455,11 @@ const brandStudioScript = String.raw`
     setText("activity", themeInput.dataset.activity || "");
     setText("progress", themeInput.dataset.progress || "");
     setText("lotOne", themeInput.dataset.lotOne || "");
+    setText("lotOneBid", themeInput.dataset.lotOneBid || "");
     setText("lotTwo", themeInput.dataset.lotTwo || "");
+    setText("lotTwoBid", themeInput.dataset.lotTwoBid || "");
     setText("lotThree", themeInput.dataset.lotThree || "");
+    setText("lotThreeBid", themeInput.dataset.lotThreeBid || "");
   }
 
   studio.querySelectorAll("[data-theme-input]").forEach((input) => {
@@ -489,9 +605,10 @@ function HeroPhone() {
             <div className="home-phone-scroll">
               {phoneMoments.map((moment) => (
                 <section className="home-phone-moment" key={moment.eyebrow}>
-                  <div className="home-phone-media" aria-hidden="true">
-                    <span />
-                    <span />
+                  <div className="home-phone-media">
+                    <Image src={moment.imageSrc} alt={moment.imageAlt} fill sizes="320px" />
+                    <span className="home-phone-media-badge">Live</span>
+                    <span className="home-phone-media-watch">On watchlist</span>
                   </div>
                   <div className="home-phone-moment-copy">
                     <span>{moment.eyebrow}</span>
@@ -531,6 +648,11 @@ function PlatformModuleCard({ module }: { module: PlatformModule }) {
         <h3>{module.title}</h3>
         <p>{module.description}</p>
       </div>
+      {module.imageSrc ? (
+        <figure className="home-module-thumbnail">
+          <Image src={module.imageSrc} alt={module.imageAlt ?? `${module.title} fundraising preview`} fill sizes="360px" />
+        </figure>
+      ) : null}
       <div className="home-module-rail" aria-hidden="true">
         <span />
       </div>
@@ -618,6 +740,38 @@ function LogoPreview() {
   );
 }
 
+function ThemeImageStack({
+  kind,
+  imageIndex = 0,
+  sizes,
+}: {
+  kind: "hero" | "card";
+  imageIndex?: number;
+  sizes: string;
+}) {
+  return (
+    <span className="home-theme-photo-stack">
+      {brandThemes.map((theme) => {
+        const image =
+          kind === "hero"
+            ? { src: theme.lotImageSrc, alt: theme.lotImageAlt }
+            : { src: theme.lots[imageIndex].imageSrc, alt: theme.lots[imageIndex].imageAlt };
+
+        return (
+          <Image
+            alt={image.alt}
+            className={`home-theme-photo home-theme-photo-${theme.id}`}
+            fill
+            key={`${kind}-${imageIndex}-${theme.id}`}
+            sizes={sizes}
+            src={image.src}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
 function PhoneSupporterPreview() {
   return (
     <article className="home-brand-preview home-preview-phone" aria-label="Phone view BIDALS supporter auction preview">
@@ -636,7 +790,8 @@ function PhoneSupporterPreview() {
           </header>
 
           <section className="home-real-phone-card" aria-label="Featured live auction lot">
-            <div className="home-real-lot-image" aria-hidden="true">
+            <div className="home-real-lot-image">
+              <ThemeImageStack kind="hero" sizes="320px" />
               <span className="home-real-image-count">1 of 4</span>
               <span className="home-real-watch">On watchlist</span>
             </div>
@@ -707,7 +862,8 @@ function DesktopSupporterPreview() {
 
         <div className="home-real-desktop-body">
           <section className="home-real-featured-lot">
-            <div className="home-real-lot-image" aria-hidden="true">
+            <div className="home-real-lot-image">
+              <ThemeImageStack kind="hero" sizes="(max-width: 900px) 100vw, 520px" />
               <span className="home-real-image-count">Featured lot</span>
               <span className="home-real-watch">On watchlist</span>
             </div>
@@ -743,19 +899,25 @@ function DesktopSupporterPreview() {
 
         <div className="home-real-lot-grid" aria-label="Illustrative auction lot grid">
           <article>
-            <span />
-            <strong data-brand-field="lotOne">{defaultBrandTheme.lots[0]}</strong>
-            <small>GBP 1,920</small>
+            <span>
+              <ThemeImageStack kind="card" imageIndex={0} sizes="180px" />
+            </span>
+            <strong data-brand-field="lotOne">{defaultBrandTheme.lots[0].title}</strong>
+            <small data-brand-field="lotOneBid">{defaultBrandTheme.lots[0].bid}</small>
           </article>
           <article>
-            <span />
-            <strong data-brand-field="lotTwo">{defaultBrandTheme.lots[1]}</strong>
-            <small>GBP 1,340</small>
+            <span>
+              <ThemeImageStack kind="card" imageIndex={1} sizes="180px" />
+            </span>
+            <strong data-brand-field="lotTwo">{defaultBrandTheme.lots[1].title}</strong>
+            <small data-brand-field="lotTwoBid">{defaultBrandTheme.lots[1].bid}</small>
           </article>
           <article>
-            <span />
-            <strong data-brand-field="lotThree">{defaultBrandTheme.lots[2]}</strong>
-            <small>GBP 760</small>
+            <span>
+              <ThemeImageStack kind="card" imageIndex={2} sizes="180px" />
+            </span>
+            <strong data-brand-field="lotThree">{defaultBrandTheme.lots[2].title}</strong>
+            <small data-brand-field="lotThreeBid">{defaultBrandTheme.lots[2].bid}</small>
           </article>
         </div>
 
@@ -785,9 +947,12 @@ function BrandPreviewStudio() {
           data-logo-ink={theme.logoInk}
           data-lot={theme.lot}
           data-lot-meta={theme.lotMeta}
-          data-lot-one={theme.lots[0]}
-          data-lot-three={theme.lots[2]}
-          data-lot-two={theme.lots[1]}
+          data-lot-one={theme.lots[0].title}
+          data-lot-one-bid={theme.lots[0].bid}
+          data-lot-three={theme.lots[2].title}
+          data-lot-three-bid={theme.lots[2].bid}
+          data-lot-two={theme.lots[1].title}
+          data-lot-two-bid={theme.lots[1].bid}
           data-next-bid={theme.nextBid}
           data-organisation={theme.organisation}
           data-primary={theme.primary}
