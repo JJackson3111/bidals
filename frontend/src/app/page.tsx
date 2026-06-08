@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import Script from "next/script";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -47,6 +49,10 @@ type BrandTheme = {
   organisation: string;
   event: string;
   initials: string;
+  primary: string;
+  secondary: string;
+  surface: string;
+  logoInk: string;
   accent: string;
   palette: string;
   story: string;
@@ -56,6 +62,9 @@ type BrandTheme = {
   nextBid: string;
   donation: string;
   raffle: string;
+  activity: string;
+  progress: string;
+  lots: string[];
 };
 
 const trustChips = ["Mobile-first experiences", "Server-authoritative records", "Enterprise-grade governance"];
@@ -183,6 +192,10 @@ const brandThemes: BrandTheme[] = [
     organisation: "Harbour House Foundation",
     event: "Spring Gala 2026",
     initials: "HH",
+    primary: "#CEFB04",
+    secondary: "#416B7C",
+    surface: "#FBFCF7",
+    logoInk: "#101714",
     accent: "Acid green / muted teal",
     palette: "Signature gala",
     story: "A polished evening auction supporting long-term community projects.",
@@ -192,12 +205,19 @@ const brandThemes: BrandTheme[] = [
     nextBid: "Quick bid GBP 2,700",
     donation: "Children's appeal GBP 12.8k",
     raffle: "Grand prize raffle 184 entries",
+    activity: "Maya joined the watchlist",
+    progress: "86% to target",
+    lots: ["Weekend retreat", "Signed guitar", "Gallery preview"],
   },
   {
     id: "mary",
     organisation: "St Mary's School",
     event: "Summer Giving Evening",
     initials: "SM",
+    primary: "#E4B84F",
+    secondary: "#17284A",
+    surface: "#FFF9ED",
+    logoInk: "#FFFDF6",
     accent: "Warm gold / deep navy",
     palette: "School evening",
     story: "A confident supporter journey for parents, alumni and local sponsors.",
@@ -207,12 +227,19 @@ const brandThemes: BrandTheme[] = [
     nextBid: "Quick bid GBP 1,250",
     donation: "Library appeal GBP 6.4k",
     raffle: "Family hamper 96 entries",
+    activity: "Alumni table placed a bid",
+    progress: "74% to target",
+    lots: ["Sports day seats", "Choir recording", "Art room bundle"],
   },
   {
     id: "oakfield",
     organisation: "Oakfield Hospice",
     event: "Care & Community Auction",
     initials: "OH",
+    primary: "#D8C6F0",
+    secondary: "#4D254D",
+    surface: "#FBF7FF",
+    logoInk: "#FFF7FF",
     accent: "Soft lavender / deep plum",
     palette: "Care campaign",
     story: "A calm, warm auction experience built around donor confidence.",
@@ -222,12 +249,19 @@ const brandThemes: BrandTheme[] = [
     nextBid: "Quick bid GBP 1,850",
     donation: "Care fund GBP 18.2k",
     raffle: "Memory tree raffle 142 entries",
+    activity: "Donor circle gift received",
+    progress: "91% to target",
+    lots: ["Private chef night", "Wellness hamper", "Ceramic collection"],
   },
   {
     id: "sports",
     organisation: "Local Sports Trust",
     event: "Clubhouse Fundraiser",
     initials: "LST",
+    primary: "#71F06A",
+    secondary: "#202422",
+    surface: "#F7FBF4",
+    logoInk: "#101412",
     accent: "Bright green / dark graphite",
     palette: "Club campaign",
     story: "A direct, energetic experience for members, families and sponsors.",
@@ -237,22 +271,129 @@ const brandThemes: BrandTheme[] = [
     nextBid: "Quick bid GBP 900",
     donation: "Youth teams GBP 9.1k",
     raffle: "Season ticket raffle 211 entries",
+    activity: "Club sponsor raised the bid",
+    progress: "68% to target",
+    lots: ["Training session", "Clubhouse dinner", "Finals tickets"],
   },
 ];
 
 const brandStudioElements = [
-  "Organisation logo",
-  "Event branding",
-  "Brand colour accents",
-  "Supporter-facing experience",
-  "Phone and desktop previews",
-  "BIDALS operating layer beneath",
+  "Upload logo",
+  "Choose accent colour",
+  "Preview supporter experience",
+  "Phone and desktop views",
+  "Powered by BIDALS",
 ];
 
 const brandViews = [
   { id: "phone", label: "Phone view", icon: Smartphone },
   { id: "desktop", label: "Desktop view", icon: Monitor },
 ];
+
+const defaultBrandTheme = brandThemes[0];
+
+const defaultStudioStyle = {
+  "--studio-accent": defaultBrandTheme.primary,
+  "--studio-accent-2": defaultBrandTheme.secondary,
+  "--studio-surface": defaultBrandTheme.surface,
+  "--studio-logo-ink": defaultBrandTheme.logoInk,
+} as CSSProperties;
+
+const brandStudioScript = String.raw`
+(() => {
+  const studio = document.querySelector("[data-brand-studio]");
+  if (!studio) return;
+
+  const logoInput = studio.querySelector("[data-logo-input]");
+  const logoImages = Array.from(studio.querySelectorAll("[data-logo-preview]"));
+  const logoInitials = Array.from(studio.querySelectorAll("[data-logo-initials]"));
+  const primaryInput = studio.querySelector("[data-colour-primary]");
+  const secondaryInput = studio.querySelector("[data-colour-secondary]");
+  let objectUrl = "";
+
+  function setText(name, value) {
+    studio.querySelectorAll("[data-brand-field='" + name + "']").forEach((node) => {
+      node.textContent = value;
+    });
+  }
+
+  function setTheme(themeInput) {
+    if (!themeInput) return;
+    studio.classList.remove("home-theme-harbour", "home-theme-mary", "home-theme-oakfield", "home-theme-sports");
+    studio.classList.add("home-theme-" + themeInput.dataset.themeId);
+    studio.style.setProperty("--studio-accent", themeInput.dataset.primary || "#CEFB04");
+    studio.style.setProperty("--studio-accent-2", themeInput.dataset.secondary || "#416B7C");
+    studio.style.setProperty("--studio-surface", themeInput.dataset.surface || "#FBFCF7");
+    studio.style.setProperty("--studio-logo-ink", themeInput.dataset.logoInk || "#101714");
+
+    if (primaryInput instanceof HTMLInputElement) primaryInput.value = themeInput.dataset.primary || "#CEFB04";
+    if (secondaryInput instanceof HTMLInputElement) secondaryInput.value = themeInput.dataset.secondary || "#416B7C";
+
+    setText("organisation", themeInput.dataset.organisation || "");
+    setText("event", themeInput.dataset.event || "");
+    setText("initials", themeInput.dataset.initials || "");
+    setText("story", themeInput.dataset.story || "");
+    setText("lot", themeInput.dataset.lot || "");
+    setText("lotMeta", themeInput.dataset.lotMeta || "");
+    setText("currentBid", themeInput.dataset.currentBid || "");
+    setText("nextBid", themeInput.dataset.nextBid || "");
+    setText("donation", themeInput.dataset.donation || "");
+    setText("raffle", themeInput.dataset.raffle || "");
+    setText("activity", themeInput.dataset.activity || "");
+    setText("progress", themeInput.dataset.progress || "");
+    setText("lotOne", themeInput.dataset.lotOne || "");
+    setText("lotTwo", themeInput.dataset.lotTwo || "");
+    setText("lotThree", themeInput.dataset.lotThree || "");
+  }
+
+  studio.querySelectorAll("[data-theme-input]").forEach((input) => {
+    input.addEventListener("change", () => {
+      if (input instanceof HTMLInputElement && input.checked) setTheme(input);
+    });
+  });
+
+  if (primaryInput instanceof HTMLInputElement) {
+    primaryInput.addEventListener("input", () => {
+      studio.style.setProperty("--studio-accent", primaryInput.value);
+    });
+  }
+
+  if (secondaryInput instanceof HTMLInputElement) {
+    secondaryInput.addEventListener("input", () => {
+      studio.style.setProperty("--studio-accent-2", secondaryInput.value);
+    });
+  }
+
+  if (logoInput instanceof HTMLInputElement) {
+    logoInput.addEventListener("change", () => {
+      const file = logoInput.files && logoInput.files[0];
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = "";
+      }
+      if (!file) {
+        studio.classList.remove("has-uploaded-logo");
+        logoImages.forEach((image) => {
+          image.style.backgroundImage = "";
+        });
+        return;
+      }
+      objectUrl = URL.createObjectURL(file);
+      logoImages.forEach((image) => {
+        image.style.backgroundImage = "url(" + objectUrl + ")";
+      });
+      logoInitials.forEach((node) => {
+        node.textContent = "";
+      });
+      studio.classList.add("has-uploaded-logo");
+    });
+  }
+
+  window.addEventListener("pagehide", () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  });
+})();
+`;
 
 const choiceCards: ProofCard[] = [
   {
@@ -466,94 +607,165 @@ function OperatingDashboard() {
   );
 }
 
-function PhoneSupporterPreview({ theme }: { theme: BrandTheme }) {
+function LogoPreview() {
   return (
-    <article className={`home-brand-preview home-preview-theme-${theme.id} home-preview-phone`}>
-      <div className={`home-supporter-phone home-theme-${theme.id}`}>
-        <div className="home-supporter-phone-top">
-          <span className="home-supporter-logo">{theme.initials}</span>
-          <div>
-            <span>{theme.organisation}</span>
-            <strong>{theme.event}</strong>
+    <span className="home-real-logo" aria-hidden="true">
+      <span className="home-real-logo-image" data-logo-preview />
+      <span data-brand-field="initials" data-logo-initials>
+        {defaultBrandTheme.initials}
+      </span>
+    </span>
+  );
+}
+
+function PhoneSupporterPreview() {
+  return (
+    <article className="home-brand-preview home-preview-phone" aria-label="Phone view BIDALS supporter auction preview">
+      <div className="home-real-phone">
+        <div className="home-real-phone-screen">
+          <header className="home-real-event-header">
+            <LogoPreview />
+            <div>
+              <span data-brand-field="organisation">{defaultBrandTheme.organisation}</span>
+              <strong data-brand-field="event">{defaultBrandTheme.event}</strong>
+            </div>
+            <em>
+              <span aria-hidden="true" />
+              Live
+            </em>
+          </header>
+
+          <section className="home-real-phone-card" aria-label="Featured live auction lot">
+            <div className="home-real-lot-image" aria-hidden="true">
+              <span className="home-real-image-count">1 of 4</span>
+              <span className="home-real-watch">On watchlist</span>
+            </div>
+            <div className="home-real-lot-copy">
+              <span data-brand-field="lotMeta">{defaultBrandTheme.lotMeta}</span>
+              <h3 data-brand-field="lot">{defaultBrandTheme.lot}</h3>
+              <p data-brand-field="story">{defaultBrandTheme.story}</p>
+            </div>
+            <div className="home-real-bid-row">
+              <span>Current bid</span>
+              <strong data-brand-field="currentBid">{defaultBrandTheme.currentBid}</strong>
+            </div>
+            <button type="button" tabIndex={-1}>
+              <span data-brand-field="nextBid">{defaultBrandTheme.nextBid}</span>
+            </button>
+          </section>
+
+          <div className="home-real-mini-modules" aria-label="Additional ways to support">
+            <article>
+              <HeartHandshake size={16} aria-hidden="true" />
+              <span>Donate</span>
+              <strong data-brand-field="donation">{defaultBrandTheme.donation}</strong>
+            </article>
+            <article>
+              <Ticket size={16} aria-hidden="true" />
+              <span>Raffle</span>
+              <strong data-brand-field="raffle">{defaultBrandTheme.raffle}</strong>
+            </article>
           </div>
-        </div>
-        <div className="home-supporter-lot-card">
-          <div className="home-supporter-lot-media" aria-hidden="true">
-            <span />
+
+          <div className="home-real-activity-strip">
+            <div>
+              <span>Bidder activity</span>
+              <strong data-brand-field="activity">{defaultBrandTheme.activity}</strong>
+            </div>
+            <div className="home-real-progress" aria-hidden="true">
+              <span />
+            </div>
+            <small data-brand-field="progress">{defaultBrandTheme.progress}</small>
           </div>
-          <span>{theme.lotMeta}</span>
-          <h3>{theme.lot}</h3>
-          <p>{theme.story}</p>
-          <div className="home-supporter-bid-row">
-            <span>Current bid</span>
-            <strong>{theme.currentBid}</strong>
-          </div>
-          <button type="button" tabIndex={-1}>
-            {theme.nextBid}
-          </button>
+
+          <small className="home-powered-line">Powered by BIDALS</small>
         </div>
-        <div className="home-supporter-mini-grid">
-          <span>
-            <HeartHandshake size={15} aria-hidden="true" />
-            {theme.donation}
-          </span>
-          <span>
-            <Ticket size={15} aria-hidden="true" />
-            {theme.raffle}
-          </span>
-        </div>
-        <small>Powered by BIDALS</small>
       </div>
     </article>
   );
 }
 
-function DesktopSupporterPreview({ theme }: { theme: BrandTheme }) {
+function DesktopSupporterPreview() {
   return (
-    <article className={`home-brand-preview home-preview-theme-${theme.id} home-preview-desktop`}>
-      <div className={`home-supporter-desktop home-theme-${theme.id}`}>
-        <header className="home-supporter-desktop-header">
+    <article className="home-brand-preview home-preview-desktop" aria-label="Desktop view BIDALS supporter auction preview">
+      <div className="home-real-desktop">
+        <header className="home-real-desktop-header">
           <div>
-            <span className="home-supporter-logo">{theme.initials}</span>
+            <LogoPreview />
             <div>
-              <span>{theme.organisation}</span>
-              <strong>{theme.event}</strong>
+              <span data-brand-field="organisation">{defaultBrandTheme.organisation}</span>
+              <strong data-brand-field="event">{defaultBrandTheme.event}</strong>
             </div>
           </div>
+          <nav aria-label="Illustrative event navigation">
+            <span>Auctions</span>
+            <span>Donate</span>
+            <span>Raffle</span>
+          </nav>
           <small>Powered by BIDALS</small>
         </header>
-        <div className="home-supporter-desktop-grid">
-          <section className="home-supporter-hero-lot">
-            <div className="home-supporter-lot-media" aria-hidden="true">
-              <span />
+
+        <div className="home-real-desktop-body">
+          <section className="home-real-featured-lot">
+            <div className="home-real-lot-image" aria-hidden="true">
+              <span className="home-real-image-count">Featured lot</span>
+              <span className="home-real-watch">On watchlist</span>
             </div>
-            <span>{theme.lotMeta}</span>
-            <h3>{theme.lot}</h3>
-            <p>{theme.story}</p>
-          </section>
-          <aside className="home-supporter-bid-panel">
-            <span>Current bid</span>
-            <strong>{theme.currentBid}</strong>
-            <button type="button" tabIndex={-1}>
-              {theme.nextBid}
-            </button>
             <div>
-              <span>
+              <span data-brand-field="lotMeta">{defaultBrandTheme.lotMeta}</span>
+              <h3 data-brand-field="lot">{defaultBrandTheme.lot}</h3>
+              <p data-brand-field="story">{defaultBrandTheme.story}</p>
+            </div>
+          </section>
+
+          <aside className="home-real-bid-panel" aria-label="Current bid panel">
+            <span>Current bid</span>
+            <strong data-brand-field="currentBid">{defaultBrandTheme.currentBid}</strong>
+            <small>Reserve met - 12m closing</small>
+            <button type="button" tabIndex={-1}>
+              <span data-brand-field="nextBid">{defaultBrandTheme.nextBid}</span>
+            </button>
+
+            <div className="home-real-side-modules">
+              <article>
                 <HeartHandshake size={15} aria-hidden="true" />
-                {theme.donation}
-              </span>
-              <span>
+                <span>Donation moment</span>
+                <strong data-brand-field="donation">{defaultBrandTheme.donation}</strong>
+              </article>
+              <article>
                 <Ticket size={15} aria-hidden="true" />
-                {theme.raffle}
-              </span>
+                <span>Raffle moment</span>
+                <strong data-brand-field="raffle">{defaultBrandTheme.raffle}</strong>
+              </article>
             </div>
           </aside>
         </div>
-        <div className="home-supporter-auction-grid" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+
+        <div className="home-real-lot-grid" aria-label="Illustrative auction lot grid">
+          <article>
+            <span />
+            <strong data-brand-field="lotOne">{defaultBrandTheme.lots[0]}</strong>
+            <small>GBP 1,920</small>
+          </article>
+          <article>
+            <span />
+            <strong data-brand-field="lotTwo">{defaultBrandTheme.lots[1]}</strong>
+            <small>GBP 1,340</small>
+          </article>
+          <article>
+            <span />
+            <strong data-brand-field="lotThree">{defaultBrandTheme.lots[2]}</strong>
+            <small>GBP 760</small>
+          </article>
         </div>
+
+        <footer className="home-real-desktop-activity">
+          <span>
+            <Activity size={15} aria-hidden="true" />
+            <strong data-brand-field="activity">{defaultBrandTheme.activity}</strong>
+          </span>
+          <span data-brand-field="progress">{defaultBrandTheme.progress}</span>
+        </footer>
       </div>
     </article>
   );
@@ -561,10 +773,31 @@ function DesktopSupporterPreview({ theme }: { theme: BrandTheme }) {
 
 function BrandPreviewStudio() {
   return (
-    <div className="home-brand-studio">
+    <div className="home-brand-studio home-theme-harbour" data-brand-studio style={defaultStudioStyle}>
       {brandThemes.map((theme, index) => (
         <input
           className={`home-brand-radio brand-theme-${theme.id}`}
+          data-activity={theme.activity}
+          data-current-bid={theme.currentBid}
+          data-donation={theme.donation}
+          data-event={theme.event}
+          data-initials={theme.initials}
+          data-logo-ink={theme.logoInk}
+          data-lot={theme.lot}
+          data-lot-meta={theme.lotMeta}
+          data-lot-one={theme.lots[0]}
+          data-lot-three={theme.lots[2]}
+          data-lot-two={theme.lots[1]}
+          data-next-bid={theme.nextBid}
+          data-organisation={theme.organisation}
+          data-primary={theme.primary}
+          data-progress={theme.progress}
+          data-raffle={theme.raffle}
+          data-secondary={theme.secondary}
+          data-story={theme.story}
+          data-surface={theme.surface}
+          data-theme-id={theme.id}
+          data-theme-input
           defaultChecked={index === 0}
           id={`brand-theme-${theme.id}`}
           key={theme.id}
@@ -587,10 +820,11 @@ function BrandPreviewStudio() {
         <aside className="home-brand-control-panel" aria-label="Brand Preview Studio controls">
           <div className="home-brand-control-heading">
             <span className="home-eyebrow">Brand Preview Studio</span>
-            <h3>See the bidder-facing experience shift by organisation.</h3>
+            <h3>See your fundraiser branded in 30 seconds.</h3>
+            <p>Preview only - nothing is uploaded or saved.</p>
           </div>
 
-          <div className="home-theme-options" aria-label="Saved example organisation themes">
+          <div className="home-theme-options" aria-label="Preset organisations">
             {brandThemes.map((theme) => (
               <label className={`home-theme-option brand-theme-label-${theme.id}`} htmlFor={`brand-theme-${theme.id}`} key={theme.id}>
                 <span className={`home-theme-swatch home-theme-${theme.id}`} aria-hidden="true">
@@ -600,9 +834,38 @@ function BrandPreviewStudio() {
                   <strong>{theme.organisation}</strong>
                   <small>{theme.event}</small>
                 </span>
-                <em>{theme.palette}</em>
+                <em>{theme.accent}</em>
               </label>
             ))}
+          </div>
+
+          <label className="home-upload-control" htmlFor="brand-logo-upload">
+            <span>Upload logo</span>
+            <strong>Choose image</strong>
+            <input accept="image/*" data-logo-input id="brand-logo-upload" type="file" />
+          </label>
+
+          <div className="home-colour-controls">
+            <label htmlFor="brand-primary-colour">
+              <span>Choose accent colour</span>
+              <input
+                aria-label="Choose accent colour"
+                data-colour-primary
+                defaultValue={defaultBrandTheme.primary}
+                id="brand-primary-colour"
+                type="color"
+              />
+            </label>
+            <label htmlFor="brand-secondary-colour">
+              <span>Choose background accent</span>
+              <input
+                aria-label="Choose background accent"
+                data-colour-secondary
+                defaultValue={defaultBrandTheme.secondary}
+                id="brand-secondary-colour"
+                type="color"
+              />
+            </label>
           </div>
 
           <div className="home-view-toggle" aria-label="Preview view toggle">
@@ -621,24 +884,22 @@ function BrandPreviewStudio() {
           <div className="home-studio-meta">
             <span>
               <Palette size={16} aria-hidden="true" />
-              Theme colour accents
+              Colours update the supporter preview instantly
             </span>
             <span>
               <ShieldCheck size={16} aria-hidden="true" />
-              BIDALS operating layer
+              Illustrative preview only. No files are uploaded or saved.
             </span>
           </div>
         </aside>
 
-        <div className="home-brand-preview-stage" aria-label="Bidder-facing branded supporter preview">
-          {brandThemes.map((theme) => (
-            <PhoneSupporterPreview key={`phone-${theme.id}`} theme={theme} />
-          ))}
-          {brandThemes.map((theme) => (
-            <DesktopSupporterPreview key={`desktop-${theme.id}`} theme={theme} />
-          ))}
+        <div className="home-brand-preview-stage" aria-label="Preview supporter experience">
+          <PhoneSupporterPreview />
+          <DesktopSupporterPreview />
         </div>
       </div>
+
+      <Script id="brand-preview-studio-v2" strategy="afterInteractive" dangerouslySetInnerHTML={{ __html: brandStudioScript }} />
     </div>
   );
 }
@@ -720,11 +981,11 @@ export default function HomePage() {
       <section className="home-section">
         <div className="home-container home-brand-section">
           <div className="home-brand-copy">
-            <span className="home-eyebrow">Brand-led deployment</span>
+            <span className="home-eyebrow">Brand Preview Studio</span>
             <h2>Your organisation. Front and centre.</h2>
             <p>
-              Show supporters an experience led by your event identity, organisation colours and campaign story — with
-              BIDALS powering the operating layer underneath.
+              Upload a logo, choose your event colours and preview how BIDALS could look through the eyes of your
+              supporters.
             </p>
             <div className="home-brand-tags" aria-label="Brand-led deployment elements">
               {brandStudioElements.map((signal) => (
