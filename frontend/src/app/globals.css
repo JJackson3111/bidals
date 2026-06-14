@@ -10382,15 +10382,16 @@ p {
   }
 
   .home-hero {
-    padding: 46px 0 48px;
+    padding: 42px 0 44px;
   }
 
   .home-hero-grid {
-    gap: 28px;
+    gap: 24px;
   }
 
+  /* Mobile hero rhythm uses explicit spacing between content layers to maintain visual hierarchy as copy length changes. */
   .home-hero-copy {
-    gap: 16px;
+    gap: 0;
   }
 
   .home-hero h1,
@@ -10402,7 +10403,12 @@ p {
   }
 
   .home-hero h1 {
+    margin-bottom: 18px;
     max-width: 7.5ch;
+  }
+
+  .home-hero .home-eyebrow {
+    margin-bottom: 14px;
   }
 
   .home-hero-lede,
@@ -10414,9 +10420,21 @@ p {
     line-height: 1.55;
   }
 
+  .home-hero-lede {
+    margin-bottom: 22px;
+  }
+
+  .home-hero-promise {
+    margin-bottom: 26px;
+  }
+
   .home-actions,
   .home-button {
     width: 100%;
+  }
+
+  .home-hero .home-actions {
+    margin-bottom: 22px;
   }
 
   .home-button {
@@ -10424,7 +10442,9 @@ p {
   }
 
   .home-trust-chips {
-    gap: 7px;
+    column-gap: 10px;
+    justify-content: center;
+    row-gap: 10px;
   }
 
   .home-trust-chips li {
